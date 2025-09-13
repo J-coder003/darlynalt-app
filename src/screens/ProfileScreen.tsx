@@ -443,7 +443,7 @@ export default function ProfileScreen() {
     <ViewShot ref={cardFrontRef} options={{ format: 'png', quality: 1.0 }}>
       <View style={[styles.idCard, styles.idCardFront]}>
         <View style={styles.idCardHeader}>
-          <Text style={styles.companyName}>COMPANY NAME</Text>
+          <Text style={styles.companyName}>DarlynAlt Global</Text>
           <Text style={styles.idCardTitle}>EMPLOYEE ID CARD</Text>
         </View>
         
@@ -542,6 +542,12 @@ export default function ProfileScreen() {
             </Text>
             <Text style={styles.returnAddress}>
               Gbagada, Ifako, Lagos
+            </Text>
+            <Text style={styles.returnAddress}>
+              08068883461
+            </Text>
+            <Text style={styles.returnAddress}>
+              darlynaltglobal@gmail.com
             </Text>
           </View>
           

@@ -9,7 +9,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Landing'>;
 export default function LandingScreen({ navigation }: Props) {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome to Darlyn</Text>
+      <Text style={styles.title}>Welcome to DarlynAlt Global </Text>
       <CustomButton title="Login" onPress={() => navigation.navigate('Auth')} />
     </View>
   );

@@ -106,11 +106,6 @@ const [unreadCount, setUnreadCount] = useState(0);
 const [prevJobs, setPrevJobs] = useState<Job[]>([]);
 const [prevInvoices, setPrevInvoices] = useState<Invoice[]>([]);
 
-
-
-
-
-
   // Installmental Plan Form State
   const [installForm, setInstallForm] = useState({
     clientName: '',
