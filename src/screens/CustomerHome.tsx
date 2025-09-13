@@ -399,7 +399,7 @@ const submitFeedback = async () => {
       <body>
         <div class="section section-blue" style="text-align:center;">
           <h1>DARLYN ALT GLOBAL</h1>
-          <div>📍 Address | 📞 Phone | ✉ Email | 🌐 Website</div>
+          <div>2 olofin close, off Ajoke salako street, Gabagada, Lagos. | 08072768813 | info@darlyn-altglobal.com | www.darlyn-altglobal.com</div>
           <h2>18-MONTH INSTALLMENT PAYMENT AGREEMENT FORM</h2>
         </div>
         <div class="photo">
@@ -569,7 +569,10 @@ const submitFeedback = async () => {
       {/* Header */}
       <View style={{ backgroundColor: '#1d4ed8', padding: 16, alignItems: 'center' }}>
         <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 20 }}>DARLYN ALT GLOBAL</Text>
-        <Text style={{ color: '#bfdbfe', marginTop: 2 }}>📍 Address | 📞 Phone | ✉ Email | 🌐 Website</Text>
+        <Text style={{ color: '#bfdbfe', marginTop: 2 }}>2 olofin close, off Ajoke salako street, Gabagada, Lagos.</Text>
+        <Text style={{ color: '#bfdbfe', marginTop: 2 }}>08072768813</Text>
+        <Text style={{ color: '#bfdbfe', marginTop: 2 }}>info@darlyn-altglobal.com,</Text>
+        <Text style={{ color: '#bfdbfe', marginTop: 2 }}>www.darlyn-altglobal.com</Text>
         <Text style={{ color: '#fff', fontWeight: 'bold', marginTop: 8, fontSize: 16 }}>
           18-MONTH INSTALLMENT PAYMENT AGREEMENT FORM
         </Text>
