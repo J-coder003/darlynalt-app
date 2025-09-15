@@ -548,13 +548,13 @@ const ChatScreen: React.FC = () => {
       // Remove failed message
       setMessages(prev => prev.filter(msg => msg._id !== tempId));
       Alert.alert('Error', 'Failed to send message');
-      setInputText(messageText); // Restore input text
+      setInputText(messageText); 
     } finally {
       setSending(false);
     }
   };
 
-  // Send image message
+ 
   const handleImagePick = () => {
     if (!roomId) return;
 
@@ -567,14 +567,14 @@ const ChatScreen: React.FC = () => {
       if (response.assets?.length) {
         const image = response.assets[0];
         
-        // Show temporary image message immediately
+        
         const tempId = `temp-img-${Date.now()}`;
         const tempMessage: Message = {
           _id: tempId,
           senderId: userId!,
           senderRole: role || 'customer',
           createdAt: new Date().toISOString(),
-          images: [image.uri], // Use local URI temporarily
+          images: [image.uri], 
           readBy: [],
         };
         setMessages(prev => [...prev, tempMessage]);
@@ -693,7 +693,7 @@ const ChatScreen: React.FC = () => {
     );
   };
 
-  // Render grouped messages
+ 
   const renderGroupedMessages = () => {
     return groupedMessages.map((group, index) => (
       <View key={`${group.date}-${index}`}>
@@ -707,7 +707,6 @@ const ChatScreen: React.FC = () => {
     ));
   };
 
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (socketRef.current) {
@@ -720,7 +719,7 @@ const ChatScreen: React.FC = () => {
     };
   }, [userId]);
 
-  // Loader
+  
   if (!userId || !role || loading) {
     return (
       <View style={styles.centerContainer}>
