@@ -287,18 +287,18 @@ useEffect(() => {
             )}
 
             {/* ✅ Complaints Section */}
-            {selectedJob?.complaints?.length > 0 && (
-              <View style={styles.modalSection}>
-                <Text style={styles.sectionLabel}>Complaints</Text>
-                {selectedJob.complaints.map((c, i) => (
-                  <View key={i} style={styles.complaintCard}>
-                    <Text style={styles.sectionValue}>• {c.title}</Text>
-                    <Text style={{ color: '#6b7280' }}>{c.description}</Text>
-                    <Text style={{ color: '#2563eb', fontSize: 12 }}>Status: {c.status}</Text>
-                  </View>
-                ))}
-              </View>
-            )}
+{selectedJob?.complaints && selectedJob.complaints.length > 0 && (
+  <View style={styles.modalSection}>
+    <Text style={styles.sectionLabel}>Complaints</Text>
+    {selectedJob.complaints.map((c, i) => (
+      <View key={i} style={styles.complaintCard}>
+        <Text style={styles.sectionValue}>• {c.title}</Text>
+        <Text style={{ color: '#6b7280' }}>{c.description}</Text>
+        <Text style={{ color: '#2563eb', fontSize: 12 }}>Status: {c.status}</Text>
+      </View>
+    ))}
+  </View>
+)}
 
             {/* ✅ Buttons */}
             <View style={{ marginTop: 20 }}>

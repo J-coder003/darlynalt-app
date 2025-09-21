@@ -1,3 +1,4 @@
+import React from "react";
 export type TabParamList = {
   Home: undefined;
   Jobs: undefined;

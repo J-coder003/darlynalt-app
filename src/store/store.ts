@@ -1,3 +1,4 @@
+import React from 'react';
 import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import authReducer from './authSlice';
 import { persistReducer, persistStore } from 'redux-persist';
