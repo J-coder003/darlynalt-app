@@ -1,14 +1,20 @@
 import React from 'react';
-import { TextInput, StyleSheet } from 'react-native';
+import { TextInput, StyleSheet, TextInputProps } from 'react-native';
 
-interface CustomInputProps {
+interface CustomInputProps extends TextInputProps {
   value: string;
   onChangeText: (text: string) => void;
   placeholder?: string;
-  secureTextEntry?: boolean;
 }
 
-export default function CustomInput({ value, onChangeText, placeholder, secureTextEntry }: CustomInputProps) {
+export default function CustomInput({
+  value,
+  onChangeText,
+  placeholder,
+  secureTextEntry,
+  keyboardType = 'default',
+  ...rest
+}: CustomInputProps) {
   return (
     <TextInput
       style={styles.input}
@@ -16,6 +22,8 @@ export default function CustomInput({ value, onChangeText, placeholder, secureTe
       onChangeText={onChangeText}
       placeholder={placeholder}
       secureTextEntry={secureTextEntry}
+      keyboardType={keyboardType}
+      {...rest}
     />
   );
 }

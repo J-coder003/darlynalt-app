@@ -10,7 +10,9 @@ export interface User {
   name?: string;
   email?: string;
   role?: Role;
-  [key: string]: any; // for other fields like _id, isApproved, etc.
+  phoneNumber?: string;
+  additionalPhoneNumber?: string;
+  [key: string]: any; 
 }
 
 interface AuthState {
@@ -30,7 +32,7 @@ const initialState: AuthState = {
 };
 
 /**
- * 🔹 Helper to normalize Mongo _id → id
+ * 🔹 Normalize Mongo _id → id
  */
 const normalizeUser = (user: any): User => ({
   ...user,
@@ -46,27 +48,20 @@ export const loginUser = createAsyncThunk<
   { rejectValue: string }
 >('auth/loginUser', async ({ email, password }, { rejectWithValue }) => {
   try {
-    // Step 1: login to get token
     const res = await api.post('/auth/login', { email, password });
     const { access_token } = res.data;
 
-    // Save token so the interceptor can attach it
     await AsyncStorage.setItem('token', access_token);
 
-    // Step 2: fetch full user info
     const userRes = await api.get('/users/me');
     const user = normalizeUser(userRes.data);
 
-    console.log('🔹 Full user after login:', user);
-
-    // Save userId
     if (user.id) {
       await AsyncStorage.setItem('userId', user.id);
     }
 
     return { token: access_token, user };
   } catch (err: any) {
-    console.log('❌ Login error:', err?.response?.data || err);
     return rejectWithValue(err?.response?.data?.message || 'Login failed');
   }
 });
@@ -76,32 +71,47 @@ export const loginUser = createAsyncThunk<
  */
 export const signupUser = createAsyncThunk<
   { token: string; user: User },
-  { name: string; email: string; password: string; role: Role },
+  {
+    name: string;
+    email: string;
+    password: string;
+    role: Role;
+    phoneNumber: string;              // ✅ required
+    additionalPhoneNumber?: string;   // ✅ optional
+  },
   { rejectValue: string }
->('auth/signupUser', async ({ name, email, password, role }, { rejectWithValue }) => {
-  try {
-    const res = await api.post('/auth/signup', { name, email, password, role });
-    const { access_token } = res.data;
+>(
+  'auth/signupUser',
+  async (
+    { name, email, password, role, phoneNumber, additionalPhoneNumber },
+    { rejectWithValue }
+  ) => {
+    try {
+      const res = await api.post('/auth/signup', {
+        name,
+        email,
+        password,
+        role,
+        phoneNumber,
+        additionalPhoneNumber,
+      });
+      const { access_token } = res.data;
 
-    // Save token
-    await AsyncStorage.setItem('token', access_token);
+      await AsyncStorage.setItem('token', access_token);
 
-    // Fetch full user info
-    const userRes = await api.get('/users/me');
-    const user = normalizeUser(userRes.data);
+      const userRes = await api.get('/users/me');
+      const user = normalizeUser(userRes.data);
 
-    console.log('🔹 Full user after signup:', user);
+      if (user.id) {
+        await AsyncStorage.setItem('userId', user.id);
+      }
 
-    if (user.id) {
-      await AsyncStorage.setItem('userId', user.id);
+      return { token: access_token, user };
+    } catch (err: any) {
+      return rejectWithValue(err?.response?.data?.message || 'Signup failed');
     }
-
-    return { token: access_token, user };
-  } catch (err: any) {
-    console.log('❌ Signup error:', err?.response?.data || err);
-    return rejectWithValue(err?.response?.data?.message || 'Signup failed');
   }
-});
+);
 
 /**
  * 🔹 Restore user session
@@ -120,15 +130,12 @@ export const loadUserFromStorage = createAsyncThunk<
     const res = await api.get('/users/me');
     const user = normalizeUser(res.data);
 
-    console.log('🔹 User restored from storage:', user);
-
     if (user.id) {
       await AsyncStorage.setItem('userId', user.id);
     }
 
     return { token, user, userId: user.id || userId };
-  } catch (err: any) {
-    console.log('❌ Restore session error:', err);
+  } catch {
     return rejectWithValue('Failed to restore session');
   }
 });
@@ -159,7 +166,10 @@ const authSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(loginUser.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(loginUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(loginUser.fulfilled, (state, action) => {
         state.loading = false;
         state.token = action.payload.token;
@@ -170,7 +180,10 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = action.payload || 'Login failed';
       })
-      .addCase(signupUser.pending, (state) => { state.loading = true; state.error = null; })
+      .addCase(signupUser.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(signupUser.fulfilled, (state, action) => {
         state.loading = false;
         state.token = action.payload.token;
@@ -181,7 +194,9 @@ const authSlice = createSlice({
         state.loading = false;
         state.error = action.payload || 'Signup failed';
       })
-      .addCase(loadUserFromStorage.pending, (state) => { state.loading = true; })
+      .addCase(loadUserFromStorage.pending, (state) => {
+        state.loading = true;
+      })
       .addCase(loadUserFromStorage.fulfilled, (state, action) => {
         state.loading = false;
         state.token = action.payload.token;

@@ -51,8 +51,10 @@ type Invoice = {
   items?: InvoiceItem[];
   paymentTerms?: string;
   deliveryTerms?: string;
+  notes?: string; // Added notes field
   payments?: PaymentRecord[];
   paymentProvider?: string;
+  includeVat?: boolean;
 };
 
 const logoSource =
@@ -87,6 +89,7 @@ export default function InvoicesScreen() {
         items: inv.items,
         paymentTerms: inv.paymentTerms || '100% payment',
         deliveryTerms: inv.deliveryTerms || '10 working days after payment',
+        notes: inv.note,
         payments: inv.payments || [],
         paymentProvider: inv.paymentProvider,
       }));
@@ -103,15 +106,20 @@ export default function InvoicesScreen() {
     fetchInvoices();
   }, []);
 
-  const calculateTotals = (invoice: Invoice) => {
-    const subtotal = (invoice.items || []).reduce(
-      (acc, item) => acc + ((item.quantity || 0) * (item.price || 0)),
-      0
-    );
-    const vat = subtotal * 0.075;
-    const grandTotal = subtotal + vat;
-    return { subtotal, vat, grandTotal };
-  };
+const calculateTotals = (invoice: Invoice) => {
+  const items = Array.isArray(invoice.items) ? invoice.items : [];
+  const subtotal = items.reduce((sum, item) => {
+    const itemTotal = (item.quantity || 0) * (item.price || 0);
+    return sum + itemTotal;
+  }, 0);
+  
+ 
+  const includeVat = invoice.includeVat !== false;
+  const vat = includeVat ? subtotal * 0.075 : 0;
+  const grandTotal = subtotal + vat;
+
+  return { subtotal, vat, grandTotal, includeVat };
+};
 
  const handlePayment = async () => {
   if (!selectedInvoice || !paymentAmount) {
@@ -219,7 +227,7 @@ export default function InvoicesScreen() {
   };
 
   const generateInvoiceHTML = (invoice: Invoice) => {
-    const { subtotal, vat, grandTotal } = calculateTotals(invoice);
+    const { subtotal, vat, grandTotal, includeVat } = calculateTotals(invoice);
 
     // Payment history section
     const paymentHistoryHTML = invoice.payments && invoice.payments.length > 0 ? `
@@ -268,6 +276,14 @@ export default function InvoicesScreen() {
         </table>
       </div>
     `;
+
+    // Notes section - only show if notes exist
+    const notesHTML = invoice.notes && invoice.notes.trim() ? `
+      <div class="terms-row">
+        <div class="terms-label">Notes:</div>
+        <div class="terms-value">${invoice.notes.replace(/\n/g, '<br>')}</div>
+      </div>
+    ` : '';
 
     return `
       <!DOCTYPE html>
@@ -382,10 +398,12 @@ export default function InvoicesScreen() {
                     <td class="label-cell">Subtotal (₦):</td>
                     <td class="amount-cell">${subtotal.toLocaleString()}</td>
                   </tr>
+                 ${includeVat ? ` 
                   <tr>
                     <td class="label-cell">VAT (7.5%) (₦):</td>
                     <td class="amount-cell">${vat.toLocaleString()}</td>
                   </tr>
+                  ` : ''}
                   <tr class="grand-total">
                     <td class="label-cell grand-total">Grand Total (₦):</td>
                     <td class="amount-cell grand-total">${grandTotal.toLocaleString()}</td>
@@ -406,6 +424,7 @@ export default function InvoicesScreen() {
                 <div class="terms-label">Delivery & Installation:</div>
                 <div class="terms-value">${invoice.deliveryTerms || '10 working days after payment'}</div>
               </div>
+              ${notesHTML}
             </div>
             
             <div class="signature-section">
@@ -510,7 +529,7 @@ export default function InvoicesScreen() {
   );
 
   const InvoicePreview = ({ invoice }: { invoice: Invoice }) => {
-    const { subtotal, vat, grandTotal } = calculateTotals(invoice);
+    const { subtotal, vat, grandTotal, includeVat } = calculateTotals(invoice);
 
     return (
       <ScrollView style={styles.previewContainer}>
@@ -521,13 +540,10 @@ export default function InvoicesScreen() {
             <Text style={styles.companyTagline}>Smart Living Starts Here</Text>
           </View>
           <View style={styles.logoPlaceholder}>
-            
-
-        <Image
-  source={logoSource}
-  style={{ width: 100, height: 100, resizeMode: "contain" }}
-/>
-
+            <Image
+              source={logoSource}
+              style={{ width: 100, height: 100, resizeMode: "contain" }}
+            />
           </View>
         </View>
 
@@ -592,21 +608,23 @@ export default function InvoicesScreen() {
           </View>
         ))}
 
-        {/* Totals */}
-        <View style={styles.totalsContainer}>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Subtotal (₦):</Text>
-            <Text style={styles.totalValue}>{subtotal.toLocaleString()}</Text>
-          </View>
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>VAT (7.5%) (₦):</Text>
-            <Text style={styles.totalValue}>{vat.toLocaleString()}</Text>
-          </View>
-          <View style={[styles.totalRow, styles.grandTotalRow]}>
-            <Text style={styles.grandTotalLabel}>Grand Total (₦):</Text>
-            <Text style={styles.grandTotalValue}>{grandTotal.toLocaleString()}</Text>
-          </View>
+            {/* Totals */}
+    <View style={styles.totalsContainer}>
+      <View style={styles.totalRow}>
+        <Text style={styles.totalLabel}>Subtotal (₦):</Text>
+        <Text style={styles.totalValue}>{subtotal.toLocaleString()}</Text>
+      </View>
+      {includeVat && (
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>VAT (7.5%) (₦):</Text>
+          <Text style={styles.totalValue}>{vat.toLocaleString()}</Text>
         </View>
+      )}
+      <View style={[styles.totalRow, styles.grandTotalRow]}>
+        <Text style={styles.grandTotalLabel}>Grand Total (₦):</Text>
+        <Text style={styles.grandTotalValue}>{grandTotal.toLocaleString()}</Text>
+      </View>
+    </View>
 
         {/* Payment Summary */}
         <View style={styles.paymentSummaryContainer}>
@@ -672,6 +690,13 @@ export default function InvoicesScreen() {
             <Text style={styles.termLabel}>Delivery & Installation:</Text>
             <Text style={styles.termValue}>{invoice.deliveryTerms || '10 working days after payment'}</Text>
           </View>
+          {/* Notes section - only show if notes exist and are not empty */}
+          {invoice.notes && invoice.notes.trim() && (
+            <View style={styles.termRow}>
+              <Text style={styles.termLabel}>Notes:</Text>
+              <Text style={styles.termValue}>{invoice.notes}</Text>
+            </View>
+          )}
         </View>
 
         {/* Signature Section */}

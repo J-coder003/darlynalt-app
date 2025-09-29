@@ -1,6 +1,13 @@
 // src/screens/SignupScreen.tsx
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Alert, TextInput, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  Alert,
+  TextInput,
+  TouchableOpacity,
+} from 'react-native';
 import CustomInput from '../components/CustomInput';
 import CustomButton from '../components/CustomButton';
 import { useDispatch, useSelector } from 'react-redux';
@@ -19,16 +26,41 @@ export default function SignupScreen({ navigation }: Props) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [additionalPhoneNumber, setAdditionalPhoneNumber] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState<'customer' | 'worker'>('customer');
 
   const handleSignup = () => {
-    if (!email || !password || !name) {
-      Alert.alert('Validation', 'Please enter name, email and password');
-      return;
-    }
-    dispatch(signupUser({ name, email, password, role }));
-  };
+  if (!name || !email || !password || !phoneNumber) {
+    Alert.alert(
+      'Validation',
+      'Please enter name, email, password, and phone number'
+    );
+    return;
+  }
+
+  // Trim spaces first
+  const trimmedAdditional = additionalPhoneNumber.trim();
+
+  // Only validate if user typed something
+  if (trimmedAdditional.length > 0 && !/^\+?[0-9]{7,15}$/.test(trimmedAdditional)) {
+    Alert.alert('Validation', 'Additional phone number must be valid');
+    return;
+  }
+
+  dispatch(
+    signupUser({
+      name,
+      email,
+      password,
+      role,
+      phoneNumber,
+      additionalPhoneNumber: trimmedAdditional,
+    })
+  );
+};
+
 
   return (
     <View style={styles.container}>
@@ -36,8 +68,20 @@ export default function SignupScreen({ navigation }: Props) {
 
       <CustomInput value={name} onChangeText={setName} placeholder="Full name" />
       <CustomInput value={email} onChangeText={setEmail} placeholder="Email" />
+      <CustomInput
+        value={phoneNumber}
+        onChangeText={setPhoneNumber}
+        placeholder="Phone Number"
+        keyboardType="phone-pad"
+      />
+      <CustomInput
+        value={additionalPhoneNumber}
+        onChangeText={setAdditionalPhoneNumber}
+        placeholder="Additional Phone (Optional)"
+        keyboardType="phone-pad"
+      />
 
-     
+      {/* Password field with toggle */}
       <View style={styles.passwordContainer}>
         <TextInput
           style={styles.passwordInput}
@@ -55,7 +99,7 @@ export default function SignupScreen({ navigation }: Props) {
         </TouchableOpacity>
       </View>
 
-     
+      {/* Role selection */}
       <View style={styles.roleContainer}>
         <View style={styles.roleButtonWrapper}>
           <CustomButton
