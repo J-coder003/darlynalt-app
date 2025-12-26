@@ -18,8 +18,6 @@ import * as Print from 'expo-print';
 import api from '../utils/api';
 import { Image, Platform } from "react-native";
 
-
-
 const { width } = Dimensions.get('window');
 
 type PaymentRecord = {
@@ -51,16 +49,28 @@ type Invoice = {
   items?: InvoiceItem[];
   paymentTerms?: string;
   deliveryTerms?: string;
-  notes?: string; // Added notes field
+  notes?: string;
   payments?: PaymentRecord[];
   paymentProvider?: string;
   includeVat?: boolean;
+  includeDiscount?: boolean;
+  discountPercent?: number;
 };
 
 const logoSource =
   Platform.OS === "web"
-    ? { uri: "/images/logo.png" } // file in public/images/logo.png
-    : require("../../assets/logo.png"); // native apps use assets
+    ? { uri: "/images/logo.png" }
+    : require("../../assets/logo.png");
+
+const signaturePreparedSource =
+  Platform.OS === "web"
+    ? { uri: "/images/signature-prepared.png" }
+    : require("../../assets/signature-prepared.png");
+
+const signatureApprovedSource =
+  Platform.OS === "web"
+    ? { uri: "/images/signature-approved.png" }
+    : require("../../assets/signature-approved.png");
 
 export default function InvoicesScreen() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -92,6 +102,9 @@ export default function InvoicesScreen() {
         notes: inv.note,
         payments: inv.payments || [],
         paymentProvider: inv.paymentProvider,
+        includeVat: inv.includeVat !== false,
+        includeDiscount: inv.includeDiscount || false,
+        discountPercent: inv.discountPercent || 0,
       }));
       setInvoices(invoiceList);
     } catch (err: any) {
@@ -106,88 +119,88 @@ export default function InvoicesScreen() {
     fetchInvoices();
   }, []);
 
-const calculateTotals = (invoice: Invoice) => {
-  const items = Array.isArray(invoice.items) ? invoice.items : [];
-  const subtotal = items.reduce((sum, item) => {
-    const itemTotal = (item.quantity || 0) * (item.price || 0);
-    return sum + itemTotal;
-  }, 0);
-  
- 
-  const includeVat = invoice.includeVat !== false;
-  const vat = includeVat ? subtotal * 0.075 : 0;
-  const grandTotal = subtotal + vat;
-
-  return { subtotal, vat, grandTotal, includeVat };
-};
-
- const handlePayment = async () => {
-  if (!selectedInvoice || !paymentAmount) {
-    Alert.alert('Error', 'Please enter a valid payment amount');
-    return;
-  }
-
-  const amount = parseFloat(paymentAmount);
-  const outstanding = selectedInvoice.outstandingAmount || 0;
-
-  if (amount <= 0) {
-    Alert.alert('Error', 'Payment amount must be greater than 0');
-    return;
-  }
-
-  if (amount > outstanding) {
-    Alert.alert('Error', `Payment amount cannot exceed outstanding amount of ₦${outstanding.toLocaleString()}`);
-    return;
-  }
-
-  try {
-    setPaymentLoading(true);
+  const calculateTotals = (invoice: Invoice) => {
+    const items = Array.isArray(invoice.items) ? invoice.items : [];
+    const subtotal = items.reduce((sum, item) => {
+      const itemTotal = (item.quantity || 0) * (item.price || 0);
+      return sum + itemTotal;
+    }, 0);
     
-    // Log the request data for debugging
-    console.log('Payment request data:', {
-      invoiceId: selectedInvoice._id,
-      amount: amount,
-      outstanding: outstanding,
-      status: selectedInvoice.status
-    });
+    const includeVat = invoice.includeVat !== false;
+    const vat = includeVat ? subtotal * 0.075 : 0;
+    const totalBeforeDiscount = subtotal + vat;
     
-    const response = await api.post(`/invoices/${selectedInvoice._id}/pay`, { amount });
-    
-    if (response.data.paymentUrl) {
-      // Open payment URL
-      const canOpen = await Linking.canOpenURL(response.data.paymentUrl);
-      if (canOpen) {
-        await Linking.openURL(response.data.paymentUrl);
-        setShowPaymentModal(false);
-        setPaymentAmount('');
-        
-        // Refresh invoices after payment attempt
-        setTimeout(() => {
-          fetchInvoices();
-        }, 2000);
-      } else {
-        Alert.alert('Error', 'Cannot open payment link');
-      }
+    const includeDiscount = invoice.includeDiscount || false;
+    const discountPercent = invoice.discountPercent || 0;
+    const discount = includeDiscount ? (totalBeforeDiscount * (discountPercent / 100)) : 0;
+    const grandTotal = totalBeforeDiscount - discount;
+
+    return { subtotal, vat, totalBeforeDiscount, discount, discountPercent, includeDiscount, grandTotal, includeVat };
+  };
+
+  const handlePayment = async () => {
+    if (!selectedInvoice || !paymentAmount) {
+      Alert.alert('Error', 'Please enter a valid payment amount');
+      return;
     }
-  } catch (error: any) {
-    console.error('Payment error details:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-    });
-    
-    // Show more detailed error message
-    const errorMessage = error.response?.data?.message || 
-                        error.response?.data?.error || 
-                        error.message || 
-                        'Failed to initiate payment';
-    
-    Alert.alert('Payment Error', errorMessage);
-  } finally {
-    setPaymentLoading(false);
-  }
-};
+
+    const amount = parseFloat(paymentAmount);
+    const outstanding = selectedInvoice.outstandingAmount || 0;
+
+    if (amount <= 0) {
+      Alert.alert('Error', 'Payment amount must be greater than 0');
+      return;
+    }
+
+    if (amount > outstanding) {
+      Alert.alert('Error', `Payment amount cannot exceed outstanding amount of ₦${outstanding.toLocaleString()}`);
+      return;
+    }
+
+    try {
+      setPaymentLoading(true);
+      
+      console.log('Payment request data:', {
+        invoiceId: selectedInvoice._id,
+        amount: amount,
+        outstanding: outstanding,
+        status: selectedInvoice.status
+      });
+      
+      const response = await api.post(`/invoices/${selectedInvoice._id}/pay`, { amount });
+      
+      if (response.data.paymentUrl) {
+        const canOpen = await Linking.canOpenURL(response.data.paymentUrl);
+        if (canOpen) {
+          await Linking.openURL(response.data.paymentUrl);
+          setShowPaymentModal(false);
+          setPaymentAmount('');
+          
+          setTimeout(() => {
+            fetchInvoices();
+          }, 2000);
+        } else {
+          Alert.alert('Error', 'Cannot open payment link');
+        }
+      }
+    } catch (error: any) {
+      console.error('Payment error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+      });
+      
+      const errorMessage = error.response?.data?.message || 
+                          error.response?.data?.error || 
+                          error.message || 
+                          'Failed to initiate payment';
+      
+      Alert.alert('Payment Error', errorMessage);
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
 
   const openPaymentModal = (invoice: Invoice) => {
     if (!['final', 'partial-payment'].includes(invoice.status || '')) {
@@ -227,9 +240,8 @@ const calculateTotals = (invoice: Invoice) => {
   };
 
   const generateInvoiceHTML = (invoice: Invoice) => {
-    const { subtotal, vat, grandTotal, includeVat } = calculateTotals(invoice);
+    const { subtotal, vat, totalBeforeDiscount, discount, discountPercent, includeDiscount, grandTotal, includeVat } = calculateTotals(invoice);
 
-    // Payment history section
     const paymentHistoryHTML = invoice.payments && invoice.payments.length > 0 ? `
       <div class="payments-section">
         <h3 style="color: #007bff; margin-bottom: 15px; font-size: 16px; border-bottom: 1px solid #007bff; padding-bottom: 5px;">Payment History</h3>
@@ -256,14 +268,12 @@ const calculateTotals = (invoice: Invoice) => {
       </div>
     ` : '';
 
-    // Payment summary section
     const paymentSummaryHTML = `
       <div class="payment-summary">
         <table style="width: 100%; max-width: 400px; margin: 0 auto 20px auto; border-collapse: collapse;">
           <tr style="background-color: #f8f9fa;">
             <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Total Invoice Amount:</td>
-            <td style="padding: 10px; border: 1px solid #ddd; text-align: right; font-weight: bold;">₦${calculateTotals(invoice).grandTotal.toLocaleString()}</td>
-
+            <td style="padding: 10px; border: 1px solid #ddd; text-align: right; font-weight: bold;">₦${grandTotal.toLocaleString()}</td>
           </tr>
           <tr style="background-color: #d4edda;">
             <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; color: #155724;">Amount Paid:</td>
@@ -277,7 +287,6 @@ const calculateTotals = (invoice: Invoice) => {
       </div>
     `;
 
-    // Notes section - only show if notes exist
     const notesHTML = invoice.notes && invoice.notes.trim() ? `
       <div class="terms-row">
         <div class="terms-label">Notes:</div>
@@ -320,6 +329,8 @@ const calculateTotals = (invoice: Invoice) => {
             .totals-table .label-cell { background-color: #f8f9fa; font-weight: bold; text-align: right; }
             .totals-table .amount-cell { text-align: right; font-weight: bold; }
             .totals-table .grand-total { background-color: #007bff; color: white; font-size: 16px; }
+            .totals-table .discount-row { background-color: #fff3cd; }
+            .totals-table .final-total { background-color: #28a745; color: white; font-size: 16px; }
             .terms-section { margin-bottom: 40px; }
             .terms-row { display: flex; margin-bottom: 15px; }
             .terms-label { font-weight: bold; min-width: 180px; color: #007bff; }
@@ -335,7 +346,7 @@ const calculateTotals = (invoice: Invoice) => {
           <div class="invoice-container">
             <div class="invoice-header">
               <div class="company-info">
-                <h1>DARLYN_ALT GLOBAL</h1>
+                <h1>DARLYN-ALT GLOBAL</h1>
                 <div class="tagline">Smart Living Starts Here</div>
               </div>
               <div class="logo-placeholder">COMPANY LOGO</div>
@@ -398,7 +409,7 @@ const calculateTotals = (invoice: Invoice) => {
                     <td class="label-cell">Subtotal (₦):</td>
                     <td class="amount-cell">${subtotal.toLocaleString()}</td>
                   </tr>
-                 ${includeVat ? ` 
+                  ${includeVat ? ` 
                   <tr>
                     <td class="label-cell">VAT (7.5%) (₦):</td>
                     <td class="amount-cell">${vat.toLocaleString()}</td>
@@ -406,8 +417,18 @@ const calculateTotals = (invoice: Invoice) => {
                   ` : ''}
                   <tr class="grand-total">
                     <td class="label-cell grand-total">Grand Total (₦):</td>
-                    <td class="amount-cell grand-total">${grandTotal.toLocaleString()}</td>
+                    <td class="amount-cell grand-total">${totalBeforeDiscount.toLocaleString()}</td>
                   </tr>
+                  ${includeDiscount ? `
+                  <tr class="discount-row">
+                    <td class="label-cell" style="background-color: #fff3cd; color: #856404;">Discount (${discountPercent}%):</td>
+                    <td class="amount-cell" style="background-color: #fff3cd; color: #856404;">-${discount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                  </tr>
+                  <tr class="final-total">
+                    <td class="label-cell" style="background-color: #28a745; color: white;">Final Total (₦):</td>
+                    <td class="amount-cell" style="background-color: #28a745; color: white;">${grandTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                  </tr>
+                  ` : ''}
                 </tbody>
               </table>
             </div>
@@ -429,12 +450,16 @@ const calculateTotals = (invoice: Invoice) => {
             
             <div class="signature-section">
               <div class="signature-box">
-                <div class="signature-line"></div>
-                <div style="font-weight: bold;">Prepared By</div>
+                <div class="signature-line" style="display: flex; align-items: center; justify-content: center; border: none;">
+                  <img src="/images/signature-prepared.png" alt="Prepared By Signature" style="max-width: 180px; max-height: 50px; object-fit: contain;" />
+                </div>
+                <div style="border-top: 1px solid #333; padding-top: 5px; font-weight: bold;">Prepared By</div>
               </div>
               <div class="signature-box">
-                <div class="signature-line"></div>
-                <div style="font-weight: bold;">Approved By</div>
+                <div class="signature-line" style="display: flex; align-items: center; justify-content: center; border: none;">
+                  <img src="/images/signature-approved.png" alt="Approved By Signature" style="max-width: 180px; max-height: 50px; object-fit: contain;" />
+                </div>
+                <div style="border-top: 1px solid #333; padding-top: 5px; font-weight: bold;">Approved By</div>
               </div>
             </div>
           </div>
@@ -473,19 +498,16 @@ const calculateTotals = (invoice: Invoice) => {
           <Text style={styles.invoiceMeta}>
             {item.createdAt ? new Date(item.createdAt).toLocaleDateString('en-GB') : '-'} • {item.status}
           </Text>
-          {/* Payment progress indicator */}
           {(item.amountPaid || 0) > 0 && (
             <Text style={styles.paymentProgress}>
-                Paid: ₦{(item.amountPaid || 0).toLocaleString()} / ₦{calculateTotals(item).grandTotal.toLocaleString()}
+              Paid: ₦{(item.amountPaid || 0).toLocaleString()} / ₦{calculateTotals(item).grandTotal.toLocaleString()}
             </Text>
-
           )}
         </View>
         <View style={styles.amountContainer}>
           <Text style={styles.invoiceAmount}>
-  ₦{calculateTotals(item).grandTotal.toLocaleString()}
-</Text>
-
+            ₦{calculateTotals(item).grandTotal.toLocaleString()}
+          </Text>
           {(item.outstandingAmount || 0) > 0 && (
             <Text style={styles.outstandingAmount}>
               Outstanding: ₦{(item.outstandingAmount || 0).toLocaleString()}
@@ -497,7 +519,6 @@ const calculateTotals = (invoice: Invoice) => {
         </View>
       </View>
       
-      {/* Action buttons */}
       {['final', 'partial-payment'].includes(item.status || '') && (item.outstandingAmount || 0) > 0 && (
         <View style={styles.actionButtons}>
           <TouchableOpacity 
@@ -529,14 +550,13 @@ const calculateTotals = (invoice: Invoice) => {
   );
 
   const InvoicePreview = ({ invoice }: { invoice: Invoice }) => {
-    const { subtotal, vat, grandTotal, includeVat } = calculateTotals(invoice);
+    const { subtotal, vat, totalBeforeDiscount, discount, discountPercent, includeDiscount, grandTotal, includeVat } = calculateTotals(invoice);
 
     return (
       <ScrollView style={styles.previewContainer}>
-        {/* Header */}
         <View style={styles.previewHeader}>
           <View style={styles.companyInfo}>
-            <Text style={styles.companyName}>DARLYN_ALT GLOBAL</Text>
+            <Text style={styles.companyName}>DARLYN-ALT GLOBAL</Text>
             <Text style={styles.companyTagline}>Smart Living Starts Here</Text>
           </View>
           <View style={styles.logoPlaceholder}>
@@ -547,12 +567,10 @@ const calculateTotals = (invoice: Invoice) => {
           </View>
         </View>
 
-        {/* Invoice Title */}
         <View style={styles.invoiceTitleContainer}>
           <Text style={styles.invoiceMainTitle}>INVOICE</Text>
         </View>
 
-        {/* Invoice Details */}
         <View style={styles.invoiceDetailsContainer}>
           <View style={styles.invoiceInfoSection}>
             <Text style={styles.detailText}>
@@ -576,7 +594,6 @@ const calculateTotals = (invoice: Invoice) => {
           </View>
         </View>
 
-        {/* Project Description */}
         {invoice.projectDescription && (
           <View style={styles.projectDescriptionContainer}>
             <Text style={styles.projectDescriptionTitle}>Project Description:</Text>
@@ -584,7 +601,6 @@ const calculateTotals = (invoice: Invoice) => {
           </View>
         )}
 
-        {/* Items Table Header */}
         <View style={styles.tableHeader}>
           <Text style={[styles.tableHeaderText, { flex: 0.8 }]}>S/N</Text>
           <Text style={[styles.tableHeaderText, { flex: 3 }]}>Item Description</Text>
@@ -594,7 +610,6 @@ const calculateTotals = (invoice: Invoice) => {
           <Text style={[styles.tableHeaderText, { flex: 1.5 }]}>Total (₦)</Text>
         </View>
 
-        {/* Items */}
         {(invoice.items || []).map((item, index) => (
           <View key={index} style={[styles.tableRow, { backgroundColor: index % 2 === 1 ? '#f8f9fa' : 'white' }]}>
             <Text style={[styles.tableCellText, styles.numberCell, { flex: 0.8 }]}>{index + 1}</Text>
@@ -608,25 +623,39 @@ const calculateTotals = (invoice: Invoice) => {
           </View>
         ))}
 
-            {/* Totals */}
-    <View style={styles.totalsContainer}>
-      <View style={styles.totalRow}>
-        <Text style={styles.totalLabel}>Subtotal (₦):</Text>
-        <Text style={styles.totalValue}>{subtotal.toLocaleString()}</Text>
-      </View>
-      {includeVat && (
-        <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>VAT (7.5%) (₦):</Text>
-          <Text style={styles.totalValue}>{vat.toLocaleString()}</Text>
+        <View style={styles.totalsContainer}>
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Subtotal (₦):</Text>
+            <Text style={styles.totalValue}>{subtotal.toLocaleString()}</Text>
+          </View>
+          {includeVat && (
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>VAT (7.5%) (₦):</Text>
+              <Text style={styles.totalValue}>{vat.toLocaleString()}</Text>
+            </View>
+          )}
+          <View style={[styles.totalRow, styles.grandTotalRow]}>
+            <Text style={styles.grandTotalLabel}>Grand Total (₦):</Text>
+            <Text style={styles.grandTotalValue}>{totalBeforeDiscount.toLocaleString()}</Text>
+          </View>
+          {includeDiscount && (
+            <>
+              <View style={[styles.totalRow, styles.discountRow]}>
+                <Text style={styles.discountLabel}>Discount ({discountPercent}%):</Text>
+                <Text style={styles.discountValue}>
+                  -{discount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                </Text>
+              </View>
+              <View style={[styles.totalRow, styles.finalTotalRow]}>
+                <Text style={styles.finalTotalLabel}>Final Total (₦):</Text>
+                <Text style={styles.finalTotalValue}>
+                  {grandTotal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}
+                </Text>
+              </View>
+            </>
+          )}
         </View>
-      )}
-      <View style={[styles.totalRow, styles.grandTotalRow]}>
-        <Text style={styles.grandTotalLabel}>Grand Total (₦):</Text>
-        <Text style={styles.grandTotalValue}>{grandTotal.toLocaleString()}</Text>
-      </View>
-    </View>
 
-        {/* Payment Summary */}
         <View style={styles.paymentSummaryContainer}>
           <Text style={styles.paymentSummaryTitle}>Payment Summary</Text>
           <View style={styles.paymentSummaryRow}>
@@ -643,7 +672,6 @@ const calculateTotals = (invoice: Invoice) => {
           </View>
         </View>
 
-        {/* Payment History */}
         {(invoice.payments?.length || 0) > 0 && (
           <View style={styles.paymentHistoryContainer}>
             <Text style={styles.paymentHistoryTitle}>Payment History</Text>
@@ -664,7 +692,6 @@ const calculateTotals = (invoice: Invoice) => {
           </View>
         )}
 
-        {/* Action Buttons */}
         {['final', 'partial-payment'].includes(invoice.status || '') && (invoice.outstandingAmount || 0) > 0 && (
           <View style={styles.previewActionButtons}>
             <TouchableOpacity 
@@ -680,7 +707,6 @@ const calculateTotals = (invoice: Invoice) => {
           </View>
         )}
 
-        {/* Terms */}
         <View style={styles.termsContainer}>
           <View style={styles.termRow}>
             <Text style={styles.termLabel}>Payment Terms:</Text>
@@ -690,7 +716,6 @@ const calculateTotals = (invoice: Invoice) => {
             <Text style={styles.termLabel}>Delivery & Installation:</Text>
             <Text style={styles.termValue}>{invoice.deliveryTerms || '10 working days after payment'}</Text>
           </View>
-          {/* Notes section - only show if notes exist and are not empty */}
           {invoice.notes && invoice.notes.trim() && (
             <View style={styles.termRow}>
               <Text style={styles.termLabel}>Notes:</Text>
@@ -699,14 +724,27 @@ const calculateTotals = (invoice: Invoice) => {
           )}
         </View>
 
-        {/* Signature Section */}
         <View style={styles.signatureContainer}>
           <View style={styles.signatureBox}>
-            <View style={styles.signatureLine} />
+            <View style={styles.signatureImageContainer}>
+              <Image
+                source={signaturePreparedSource}
+                style={styles.signatureImage}
+                resizeMode="contain"
+              />
+            </View>
+            <View style={styles.signatureLineBottom} />
             <Text style={styles.signatureLabel}>Prepared By</Text>
           </View>
           <View style={styles.signatureBox}>
-            <View style={styles.signatureLine} />
+            <View style={styles.signatureImageContainer}>
+              <Image
+                source={signatureApprovedSource}
+                style={styles.signatureImage}
+                resizeMode="contain"
+              />
+            </View>
+            <View style={styles.signatureLineBottom} />
             <Text style={styles.signatureLabel}>Approved By</Text>
           </View>
         </View>
@@ -732,7 +770,6 @@ const calculateTotals = (invoice: Invoice) => {
         />
       )}
 
-      {/* Invoice Preview Modal */}
       <Modal 
         visible={!!selectedInvoice && !showPaymentModal && !showPaymentHistory} 
         animationType="slide" 
@@ -757,7 +794,6 @@ const calculateTotals = (invoice: Invoice) => {
         </View>
       </Modal>
 
-      {/* Payment Modal */}
       <Modal
         visible={showPaymentModal}
         animationType="slide"
@@ -855,7 +891,6 @@ const calculateTotals = (invoice: Invoice) => {
         </View>
       </Modal>
 
-      {/* Payment History Modal */}
       <Modal
         visible={showPaymentHistory}
         animationType="slide"
@@ -1274,7 +1309,32 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
-  // Payment Summary Styles
+  discountRow: {
+    backgroundColor: '#fff3cd',
+  },
+  discountLabel: {
+    color: '#856404',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  discountValue: {
+    color: '#856404',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  finalTotalRow: {
+    backgroundColor: '#28a745',
+  },
+  finalTotalLabel: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  finalTotalValue: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
   paymentSummaryContainer: {
     padding: 20,
     backgroundColor: '#f8f9fa',
@@ -1327,7 +1387,6 @@ const styles = StyleSheet.create({
   outstandingAmountValue: {
     color: '#721c24',
   },
-  // Payment History in Preview
   paymentHistoryContainer: {
     padding: 20,
     borderTopWidth: 1,
@@ -1427,6 +1486,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: 150,
   },
+  signatureImageContainer: {
+    height: 60,
+    width: 180,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  signatureImage: {
+    width: 180,
+    height: 50,
+  },
+  signatureLineBottom: {
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+    width: '100%',
+    marginBottom: 5,
+  },
   signatureLine: {
     borderTopWidth: 1,
     borderTopColor: '#333',
@@ -1439,7 +1515,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#333',
   },
-  // Payment Modal Styles
   paymentModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1566,7 +1641,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 16,
   },
-  // Payment History Modal Styles
   paymentHistoryScroll: {
     flex: 1,
     backgroundColor: 'white',

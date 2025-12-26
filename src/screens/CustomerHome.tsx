@@ -871,7 +871,7 @@ const submitFeedback = async () => {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={styles.appTitle}>DARLYN_ALT</Text>
+            <Text style={styles.appTitle}>DARLYN-ALT</Text>
           </View>
           <TouchableOpacity style={styles.notificationButton} onPress={handleOpenNotifications}>
   <Icon name="bell" size={20} color="#fff" />
