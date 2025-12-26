@@ -17,9 +17,12 @@ export default function App() {
         }
         persistor={persistor}
       >
-        <NavigationContainer>
-          {/* ✅ Global StatusBar for consistent theme */}
-          
+        <NavigationContainer
+          documentTitle={{
+            formatter: (options, route) =>
+              `${options?.title ?? route?.name ?? 'Home'} - Darlyn-Alt`,
+          }}
+        >
           <StatusBar barStyle="dark-content" backgroundColor="#fff" />
           <AppNavigator />
         </NavigationContainer>

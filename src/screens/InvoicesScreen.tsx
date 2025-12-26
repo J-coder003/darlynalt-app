@@ -558,6 +558,9 @@ export default function InvoicesScreen() {
           <View style={styles.companyInfo}>
             <Text style={styles.companyName}>DARLYN-ALT GLOBAL</Text>
             <Text style={styles.companyTagline}>Smart Living Starts Here</Text>
+            <Text style={styles.companyTagline}>No 2, olofin close, off ajoke salako street, Ifako, Gbagada Lagos Nigeria.</Text>
+            <Text style={styles.companyTagline}>info@darlyn-altglobal.com</Text>
+            <Text style={styles.companyTagline}>www.darlyn-altglobal.com</Text>
           </View>
           <View style={styles.logoPlaceholder}>
             <Image
