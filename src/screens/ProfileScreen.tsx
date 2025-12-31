@@ -12,6 +12,7 @@ import {
   Modal,
   Image,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -26,14 +27,12 @@ import QRCode from 'react-native-qrcode-svg';
 import ViewShot from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
-import { Platform } from "react-native";
-import html2canvas from "html2canvas";
 
 const { width: screenWidth } = Dimensions.get('window');
-const cardWidth = screenWidth * 0.85;
+// Adjusted card size - smaller for better mobile display
+const cardWidth = Math.min(screenWidth * 0.85, 340); // Max 340px
 const cardHeight = cardWidth * 0.63; // Standard ID card ratio
 
-// Default MD signature (you can replace this with actual MD signature)
 const DEFAULT_MD_SIGNATURE = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
 
 type ProfileScreenNavigationProp = NativeStackNavigationProp<
@@ -86,7 +85,7 @@ const getInitials = (name: string) => {
 
 const generateStaffId = () => {
   const prefix = 'STF';
-  const randomNum = Math.floor(Math.random() * 900000) + 100000; // 6 digit number
+  const randomNum = Math.floor(Math.random() * 900000) + 100000;
   return `${prefix}${randomNum}`;
 };
 
@@ -120,7 +119,7 @@ interface IDCardData {
   phoneNumber: string;
   photo: string | null;
   signature: string | null;
-  mdSignature: string; // Auto-set MD signature
+  mdSignature: string;
 }
 
 export default function ProfileScreen() {
@@ -140,20 +139,17 @@ export default function ProfileScreen() {
   const cardFrontRef = useRef<ViewShot>(null);
   const cardBackRef = useRef<ViewShot>(null);
 
-  // Form states
   const [formData, setFormData] = useState({
     name: '',
     email: '',
   });
 
-  // Password form states
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: '',
   });
 
-  // ID Card form states - MD signature is auto-set
   const [idCardData, setIdCardData] = useState<IDCardData>({
     staffId: generateStaffId(),
     department: '',
@@ -166,7 +162,7 @@ export default function ProfileScreen() {
     phoneNumber: '',
     photo: null,
     signature: null,
-    mdSignature: DEFAULT_MD_SIGNATURE, // Auto-set
+    mdSignature: DEFAULT_MD_SIGNATURE,
   });
 
   useEffect(() => {
@@ -196,7 +192,6 @@ export default function ProfileScreen() {
       const savedIDCard = await AsyncStorage.getItem('idCardData');
       if (savedIDCard) {
         const parsedData = JSON.parse(savedIDCard);
-        // Ensure MD signature is always set
         parsedData.mdSignature = parsedData.mdSignature || DEFAULT_MD_SIGNATURE;
         setIdCardData(parsedData);
         setHasExistingIDCard(true);
@@ -317,12 +312,11 @@ export default function ProfileScreen() {
       return;
     }
 
-    // Calculate expiry date (5 years from joining date)
     const expiryDate = calculateExpiryDate(idCardData.dateOfJoining);
     const updatedData = { 
       ...idCardData, 
       expiryDate,
-      mdSignature: DEFAULT_MD_SIGNATURE // Ensure MD signature is set
+      mdSignature: DEFAULT_MD_SIGNATURE
     };
     
     setIdCardData(updatedData);
@@ -335,71 +329,66 @@ export default function ProfileScreen() {
     try {
       setIsExporting(true);
       
-      const captureView = async (ref: React.RefObject<ViewShot | null>): Promise<string | undefined> => {
-        if (!ref.current) return;
+      // Simple capture - just get the current side
+      const currentRef = cardSide === 'front' ? cardFrontRef : cardBackRef;
+      
+      if (!currentRef.current || !currentRef.current.capture) {
+        throw new Error('Card not ready');
+      }
 
-        if (Platform.OS === "web") {
-          // Get the DOM element from the ref
-          const element = ref.current as any;
-          if (!element || !element.getBoundingClientRect) {
-            throw new Error("Invalid element reference");
-          }
-          
-          const canvas = await html2canvas(element);
-          return canvas.toDataURL("image/png");
+      console.log('Starting capture...');
+      
+      // Capture with timeout
+      const capturePromise = (currentRef.current.capture as () => Promise<string>)();
+      const timeoutPromise = new Promise<string>((_, reject) => 
+        setTimeout(() => reject(new Error('Capture timeout')), 5000)
+      );
+      
+      const uri = await Promise.race([capturePromise, timeoutPromise]);
+      
+      console.log('Captured URI:', uri);
+
+      // For mobile, use sharing
+      if (Platform.OS !== 'web') {
+        const isAvailable = await Sharing.isAvailableAsync();
+        if (isAvailable) {
+          await Sharing.shareAsync(uri, {
+            mimeType: 'image/png',
+            dialogTitle: `ID Card - ${cardSide === 'front' ? 'Front' : 'Back'}`,
+          });
+          Alert.alert('Success', 'ID card exported successfully!');
         } else {
-          // React Native - use ViewShot
-          return ref.current.capture && ref.current.capture();
+          throw new Error('Sharing not available');
         }
-      };
-
-      // Capture front side
-      const frontUri = await captureView(cardFrontRef);
-      if (!frontUri) {
-        throw new Error("Failed to capture front side");
-      }
-
-      // Switch to back side and wait for render
-      setCardSide("back");
-      await new Promise(resolve => setTimeout(resolve, 500)); // Wait longer for render
-
-      // Capture back side
-      const backUri = await captureView(cardBackRef);
-      if (!backUri) {
-        throw new Error("Failed to capture back side");
-      }
-
-      // Handle sharing based on platform
-      if (Platform.OS === 'web') {
-        // For web, create download links
-        const downloadImage = (uri: string, filename: string) => {
-          const link = document.createElement('a');
-          link.href = uri;
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        };
-
-        downloadImage(frontUri, `${idCardData.staffId}_front.png`);
-        downloadImage(backUri, `${idCardData.staffId}_back.png`);
-        Alert.alert('Success', 'ID cards downloaded successfully!');
       } else {
-        // For React Native, use sharing
-        if (await Sharing.isAvailableAsync()) {
-          await Sharing.shareAsync(frontUri);
-        }
+        // For web - create download
+        const link = document.createElement('a');
+        link.href = uri;
+        link.download = `${idCardData.staffId}_${cardSide}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        Alert.alert('Success', 'ID card downloaded successfully!');
       }
-
-    } catch (error) {
-      console.error("Error exporting ID card:", error);
-      Alert.alert('Error', 'Failed to export ID card. Please try again.');
-    } finally {
+      
       setIsExporting(false);
+    } catch (error) {
+      console.error('Export error:', error);
+      setIsExporting(false);
+      
+      // Show error and screenshot instructions
+      const screenshotInstructions = Platform.OS === 'web'
+        ? 'To save your ID card:\n\n1. Right-click on the card\n2. Select "Save image as..."\n3. Save both front and back sides\n\nOr:\n• Windows: Press Windows + Shift + S\n• Mac: Press Cmd + Shift + 4'
+        : 'To save your ID card:\n\n1. Take a screenshot of the front side\n2. Switch to back side using the toggle\n3. Take another screenshot\n\nScreenshot Instructions:\n• iPhone: Press Side Button + Volume Up\n• Android: Press Power + Volume Down';
+      
+      Alert.alert(
+        'Export Failed',
+        `Unable to export ID card automatically.\n\n${screenshotInstructions}`,
+        [{ text: 'OK' }]
+      );
     }
   };
 
-  // Enhanced QR data with more information
   const qrData = JSON.stringify({
     staffId: idCardData.staffId,
     name: profile?.name,
@@ -443,7 +432,7 @@ export default function ProfileScreen() {
     <ViewShot ref={cardFrontRef} options={{ format: 'png', quality: 1.0 }}>
       <View style={[styles.idCard, styles.idCardFront]}>
         <View style={styles.idCardHeader}>
-          <Text style={styles.companyName}>DarlynAlt Global</Text>
+          <Text style={styles.companyName}>Darlyn-Alt LTD</Text>
           <Text style={styles.idCardTitle}>EMPLOYEE ID CARD</Text>
         </View>
         
@@ -454,12 +443,11 @@ export default function ProfileScreen() {
                 <Image source={{ uri: idCardData.photo }} style={styles.employeePhoto} />
               ) : (
                 <View style={styles.photoPlaceholder}>
-                  <Ionicons name="person" size={40} color="#1E3A8A" />
+                  <Ionicons name="person" size={30} color="#1E3A8A" />
                 </View>
               )}
             </View>
             
-            {/* Worker Signature Section - Replaced QR code */}
             <View style={styles.signatureSection}>
               <Text style={styles.frontSignatureLabel}>Employee</Text>
               {idCardData.signature ? (
@@ -473,10 +461,10 @@ export default function ProfileScreen() {
           </View>
           
           <View style={styles.rightSection}>
-            <Text style={styles.employeeName}>{profile?.name}</Text>
+            <Text style={styles.employeeName} numberOfLines={2}>{profile?.name}</Text>
             <Text style={styles.staffId}>ID: {idCardData.staffId}</Text>
-            <Text style={styles.department}>{idCardData.department}</Text>
-            <Text style={styles.position}>{idCardData.position}</Text>
+            <Text style={styles.department} numberOfLines={1}>{idCardData.department}</Text>
+            <Text style={styles.position} numberOfLines={1}>{idCardData.position}</Text>
             <Text style={styles.validityText}>
               Valid: {idCardData.dateOfJoining} - {idCardData.expiryDate}
             </Text>
@@ -500,7 +488,7 @@ export default function ProfileScreen() {
         <View style={styles.backBody}>
           <View style={styles.backInfoRow}>
             <Text style={styles.backLabel}>Email:</Text>
-            <Text style={styles.backValue}>{profile?.email}</Text>
+            <Text style={styles.backValue} numberOfLines={1}>{profile?.email}</Text>
           </View>
           
           <View style={styles.backInfoRow}>
@@ -509,7 +497,7 @@ export default function ProfileScreen() {
           </View>
           
           <View style={styles.backInfoRow}>
-            <Text style={styles.backLabel}>Blood Group:</Text>
+            <Text style={styles.backLabel}>Blood:</Text>
             <Text style={styles.backValue}>{idCardData.bloodGroup || 'N/A'}</Text>
           </View>
           
@@ -520,10 +508,9 @@ export default function ProfileScreen() {
           
           <View style={styles.addressSection}>
             <Text style={styles.backLabel}>Address:</Text>
-            <Text style={styles.addressText}>{idCardData.address}</Text>
+            <Text style={styles.addressText} numberOfLines={2}>{idCardData.address}</Text>
           </View>
           
-          {/* MD Signature at the back */}
           <View style={styles.backSignatureSection}>
             <Text style={styles.backSignatureLabel}>Managing Director</Text>
             {idCardData.mdSignature && (
@@ -534,41 +521,27 @@ export default function ProfileScreen() {
         
         <View style={styles.backFooter}>
           <View style={styles.returnInfo}>
-            <Text style={styles.returnText}>
-              If found, please return to:
-            </Text>
-            <Text style={styles.returnAddress}>
-              3 Olofin Close, Off Ajoke salako Street,
-            </Text>
-            <Text style={styles.returnAddress}>
-              Gbagada, Ifako, Lagos
-            </Text>
-            <Text style={styles.returnAddress}>
-              08072768813
-            </Text>
-            <Text style={styles.returnAddress}>
-              info@darlyn-altglobal.com
-            </Text>
-            <Text style={styles.returnAddress}>
-              www.darlyn-altglobal.com
-            </Text>
+            <Text style={styles.returnText}>If found, please return to:</Text>
+            <Text style={styles.returnAddress}>3 Olofin Close, Off Ajoke salako Street,</Text>
+            <Text style={styles.returnAddress}>Gbagada, Ifako, Lagos</Text>
+            <Text style={styles.returnAddress}>08072768813</Text>
+            <Text style={styles.returnAddress}>info@darlyn-altglobal.com</Text>
           </View>
           
           <View style={styles.qrFooter}>
             <QRCode
               value={qrData}
-              size={40}
+              size={35}
               backgroundColor="transparent"
               color="#1E3A8A"
             />
-            <Text style={styles.backFooterText}>Scan to verify</Text>
+            <Text style={styles.backFooterText}>Scan</Text>
           </View>
         </View>
       </View>
     </ViewShot>
   );
 
-  // Rest of the component remains the same until the form modal...
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -597,7 +570,6 @@ export default function ProfileScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Header */}
         <View style={styles.header}>
           <View style={styles.avatarContainer}>
             {profile?.name ? (
@@ -614,11 +586,9 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Profile Information */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Profile Information</Text>
           
-          {/* User ID - Non-editable */}
           <View style={styles.fieldContainer}>
             <Text style={styles.fieldLabel}>User ID</Text>
             <View style={styles.nonEditableField}>
@@ -627,7 +597,6 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* Role - Non-editable */}
           <View style={styles.fieldContainer}>
             <Text style={styles.fieldLabel}>Role</Text>
             <View style={styles.nonEditableField}>
@@ -636,7 +605,6 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* Name - Editable */}
           <View style={styles.fieldContainer}>
             <Text style={styles.fieldLabel}>Name</Text>
             {isEditing ? (
@@ -654,7 +622,6 @@ export default function ProfileScreen() {
             )}
           </View>
 
-          {/* Email - Editable */}
           <View style={styles.fieldContainer}>
             <Text style={styles.fieldLabel}>Email</Text>
             {isEditing ? (
@@ -673,7 +640,6 @@ export default function ProfileScreen() {
             )}
           </View>
 
-          {/* Action Buttons */}
           <View style={styles.actionButtons}>
             {isEditing ? (
               <View style={styles.editActions}>
@@ -708,7 +674,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* ID Card Generation Section - Only for workers */}
         {profile.role === 'worker' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Employee ID Card</Text>
@@ -766,7 +731,6 @@ export default function ProfileScreen() {
           </View>
         )}
 
-        {/* Password Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Security</Text>
           
@@ -844,7 +808,6 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {/* Logout Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account</Text>
           <TouchableOpacity
@@ -857,7 +820,6 @@ export default function ProfileScreen() {
         </View>
       </ScrollView>
 
-      {/* ID Card Form Modal - Removed MD signature field */}
       <Modal
         visible={showIDCardForm}
         animationType="slide"
@@ -1003,7 +965,6 @@ export default function ProfileScreen() {
         </SafeAreaView>
       </Modal>
 
-      {/* ID Card Display Modal */}
       <Modal
         visible={showIDCardModal}
         animationType="slide"
@@ -1024,7 +985,7 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.cardContainer}>
+          <ScrollView contentContainerStyle={styles.cardContainer}>
             <View style={styles.cardToggle}>
               <TouchableOpacity
                 style={[styles.toggleButton, cardSide === 'front' && styles.activeToggle]}
@@ -1059,7 +1020,7 @@ export default function ProfileScreen() {
                 Valid from {idCardData.dateOfJoining} to {idCardData.expiryDate}
               </Text>
             </View>
-          </View>
+          </ScrollView>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -1333,7 +1294,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   
-  // Modal Styles
   modalContainer: {
     flex: 1,
     backgroundColor: '#F2F2F7',
@@ -1406,7 +1366,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   
-  // ID Card Modal Styles
   cardModalContainer: {
     flex: 1,
     backgroundColor: '#F2F2F7',
@@ -1427,9 +1386,10 @@ const styles = StyleSheet.create({
     color: '#1C1C1E',
   },
   cardContainer: {
-    flex: 1,
+    flexGrow: 1,
     padding: 20,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   cardToggle: {
     flexDirection: 'row',
@@ -1456,10 +1416,7 @@ const styles = StyleSheet.create({
   cardWrapper: {
     marginBottom: 20,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 8,
@@ -1467,12 +1424,12 @@ const styles = StyleSheet.create({
   cardInfo: {
     alignItems: 'center',
     gap: 8,
+    paddingHorizontal: 20,
   },
   cardInstructions: {
     fontSize: 14,
     color: '#8E8E93',
     textAlign: 'center',
-    paddingHorizontal: 20,
     lineHeight: 20,
   },
   validityInfo: {
@@ -1482,7 +1439,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   
-  // ID Card Styles
   idCard: {
     width: cardWidth,
     height: cardHeight,
@@ -1502,45 +1458,45 @@ const styles = StyleSheet.create({
   },
   idCardHeader: {
     backgroundColor: '#1E3A8A',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     alignItems: 'center',
   },
   companyName: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: 'bold',
     color: '#FFFFFF',
     letterSpacing: 1,
   },
   idCardTitle: {
-    fontSize: 11,
+    fontSize: 10,
     color: '#FFFFFF',
     marginTop: 2,
   },
   idCardBody: {
     flex: 1,
     flexDirection: 'row',
-    padding: 16,
+    padding: 12,
     backgroundColor: '#FFFFFF',
   },
   leftSection: {
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 12,
     justifyContent: 'space-between',
   },
   photoSection: {
     alignItems: 'center',
   },
   employeePhoto: {
-    width: 80,
-    height: 90,
+    width: 70,
+    height: 80,
     borderRadius: 8,
     borderWidth: 2,
     borderColor: '#1E3A8A',
   },
   photoPlaceholder: {
-    width: 80,
-    height: 90,
+    width: 70,
+    height: 80,
     borderRadius: 8,
     backgroundColor: '#F2F2F7',
     justifyContent: 'center',
@@ -1553,50 +1509,49 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   employeeName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#1E3A8A',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   staffId: {
-    fontSize: 13,
+    fontSize: 11,
+    color: '#1C1C1E',
+    marginBottom: 5,
+  },
+  department: {
+    fontSize: 10,
+    color: '#1C1C1E',
+    marginBottom: 3,
+  },
+  position: {
+    fontSize: 9,
     color: '#1C1C1E',
     marginBottom: 6,
   },
-  department: {
-    fontSize: 12,
-    color: '#1C1C1E',
-    marginBottom: 4,
-  },
-  position: {
-    fontSize: 11,
-    color: '#1C1C1E',
-    marginBottom: 8,
-  },
   validityText: {
-    fontSize: 9,
+    fontSize: 8,
     color: '#8E8E93',
     fontWeight: '500',
   },
-  // Worker signature section on front (replaced QR)
   signatureSection: {
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 6,
   },
   frontSignatureLabel: {
-    fontSize: 8,
+    fontSize: 7,
     fontWeight: '600',
     color: '#1E3A8A',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   frontSignatureImage: {
-    width: 60,
-    height: 20,
+    width: 45,
+    height: 18,
     borderRadius: 2,
   },
   signaturePlaceholder: {
-    width: 60,
-    height: 20,
+    width: 45,
+    height: 18,
     backgroundColor: '#F2F2F7',
     borderRadius: 2,
     justifyContent: 'center',
@@ -1608,84 +1563,81 @@ const styles = StyleSheet.create({
   },
   idCardFooter: {
     backgroundColor: '#1E3A8A',
-    paddingVertical: 6,
-    paddingHorizontal: 16,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
     alignItems: 'center',
   },
   footerText: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#FFFFFF',
     fontWeight: '500',
   },
   
-  // ID Card Back Styles
   backHeader: {
     backgroundColor: '#1E3A8A',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     alignItems: 'center',
   },
   backTitle: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
     color: '#FFFFFF',
     letterSpacing: 1,
   },
   backBody: {
     flex: 1,
-    padding: 16,
+    padding: 12,
     backgroundColor: '#FFFFFF',
-    height: cardHeight - 72,
   },
   backInfoRow: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: 6,
     alignItems: 'flex-start',
   },
   backLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: '600',
     color: '#1E3A8A',
-    width: 70,
-    marginRight: 8,
+    width: 65,
+    marginRight: 6,
   },
   backValue: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#1C1C1E',
     flex: 1,
     flexWrap: 'wrap',
   },
   addressSection: {
-    marginBottom: 12,
+    marginBottom: 8,
   },
   addressText: {
-    fontSize: 9,
+    fontSize: 8,
     color: '#1C1C1E',
-    lineHeight: 12,
-    marginTop: 4,
+    lineHeight: 11,
+    marginTop: 3,
   },
-  // MD Signature section on back
   backSignatureSection: {
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   backSignatureLabel: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: '600',
     color: '#1E3A8A',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   backSignatureImage: {
-    width: 80,
-    height: 25,
+    width: 70,
+    height: 22,
     borderRadius: 2,
   },
   backFooter: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     backgroundColor: '#F8F9FF',
     borderTopWidth: 1,
     borderTopColor: '#E5E5EA',
@@ -1694,21 +1646,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   returnText: {
-    fontSize: 8,
+    fontSize: 7,
     color: '#1E3A8A',
     fontWeight: '600',
     marginBottom: 2,
   },
   returnAddress: {
-    fontSize: 7,
+    fontSize: 6.5,
     color: '#1C1C1E',
-    lineHeight: 9,
+    lineHeight: 8,
   },
   qrFooter: {
     alignItems: 'center',
   },
   backFooterText: {
-    fontSize: 7,
+    fontSize: 6,
     color: '#1E3A8A',
     fontWeight: '500',
     marginTop: 2,
