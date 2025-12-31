@@ -524,8 +524,9 @@ export default function ProfileScreen() {
             <Text style={styles.returnText}>If found, please return to:</Text>
             <Text style={styles.returnAddress}>3 Olofin Close, Off Ajoke salako Street,</Text>
             <Text style={styles.returnAddress}>Gbagada, Ifako, Lagos</Text>
-            <Text style={styles.returnAddress}>08072768813</Text>
+            <Text style={styles.returnAddress}>08072768813, 08068883461</Text>
             <Text style={styles.returnAddress}>info@darlyn-altglobal.com</Text>
+             <Text style={styles.returnAddress}>www.darlyn-altglobal.com</Text>
           </View>
           
           <View style={styles.qrFooter}>
