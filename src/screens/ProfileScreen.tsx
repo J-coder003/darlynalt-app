@@ -538,16 +538,19 @@ export default function ProfileScreen() {
               If found, please return to:
             </Text>
             <Text style={styles.returnAddress}>
-              2 Olofin Close, Off Ajoke Street,
+              3 Olofin Close, Off Ajoke salako Street,
             </Text>
             <Text style={styles.returnAddress}>
               Gbagada, Ifako, Lagos
             </Text>
             <Text style={styles.returnAddress}>
-              08068883461
+              08072768813
             </Text>
             <Text style={styles.returnAddress}>
-              darlynaltglobal@gmail.com
+              info@darlyn-altglobal.com
+            </Text>
+            <Text style={styles.returnAddress}>
+              www.darlyn-altglobal.com
             </Text>
           </View>
           
@@ -1632,6 +1635,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     backgroundColor: '#FFFFFF',
+    height: cardHeight - 72,
   },
   backInfoRow: {
     flexDirection: 'row',
