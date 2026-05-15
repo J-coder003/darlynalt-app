@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Platform,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
@@ -93,7 +94,11 @@ export default function RequestDetailsScreen() {
       : request.totalAmount;
 
     if (request.type === 'wage' && (!approvalAmount || amount <= 0)) {
-      Alert.alert('Error', 'Please enter a valid approval amount');
+      if (Platform.OS === 'web') {
+        alert('Error: Please enter a valid approval amount');
+      } else {
+        Alert.alert('Error', 'Please enter a valid approval amount');
+      }
       return;
     }
 
@@ -102,47 +107,81 @@ export default function RequestDetailsScreen() {
       await api.put(`/money-requests/${requestId}/approve`, {
         approvedAmount: amount,
       });
-      Alert.alert('Success', 'Request approved and funds transferred successfully', [
-        { text: 'OK', onPress: () => navigation.goBack() }
-      ]);
+      
+      if (Platform.OS === 'web') {
+        alert('Success: Request approved and funds transferred successfully');
+        navigation.goBack();
+      } else {
+        Alert.alert('Success', 'Request approved and funds transferred successfully', [
+          { text: 'OK', onPress: () => navigation.goBack() }
+        ]);
+      }
       setShowApproveModal(false);
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to approve request');
+      const errorMsg = error.response?.data?.message || 'Failed to approve request';
+      if (Platform.OS === 'web') {
+        alert('Error: ' + errorMsg);
+      } else {
+        Alert.alert('Error', errorMsg);
+      }
     } finally {
       setProcessing(false);
     }
   };
 
   const handleReject = () => {
-    Alert.alert(
-      'Reject Request',
-      'Are you sure you want to reject this request?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reject',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setProcessing(true);
-              await api.put(`/money-requests/${requestId}/reject`);
-              Alert.alert('Success', 'Request rejected', [
-                { text: 'OK', onPress: () => navigation.goBack() }
-              ]);
-            } catch (error: any) {
-              Alert.alert('Error', error.response?.data?.message || 'Failed to reject request');
-            } finally {
-              setProcessing(false);
-            }
-          },
-        },
-      ]
-    );
+    const confirmReject = () => {
+      return new Promise<boolean>((resolve) => {
+        if (Platform.OS === 'web') {
+          resolve(confirm('Are you sure you want to reject this request?'));
+        } else {
+          Alert.alert(
+            'Reject Request',
+            'Are you sure you want to reject this request?',
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Reject', style: 'destructive', onPress: () => resolve(true) },
+            ]
+          );
+        }
+      });
+    };
+
+    confirmReject().then(async (confirmed) => {
+      if (!confirmed) return;
+
+      try {
+        setProcessing(true);
+        await api.put(`/money-requests/${requestId}/reject`);
+        
+        if (Platform.OS === 'web') {
+          alert('Success: Request rejected');
+          navigation.goBack();
+        } else {
+          Alert.alert('Success', 'Request rejected', [
+            { text: 'OK', onPress: () => navigation.goBack() }
+          ]);
+        }
+      } catch (error: any) {
+        const errorMsg = error.response?.data?.message || 'Failed to reject request';
+        if (Platform.OS === 'web') {
+          alert('Error: ' + errorMsg);
+        } else {
+          Alert.alert('Error', errorMsg);
+        }
+      } finally {
+        setProcessing(false);
+      }
+    });
   };
 
   const handleNegotiate = async () => {
     if (!negotiationMessage.trim() && !proposedAmount) {
-      Alert.alert('Error', 'Please enter a message or proposed amount');
+      if (Platform.OS === 'web') {
+        alert('Error: Please enter a message or proposed amount');
+      } else {
+        Alert.alert('Error', 'Please enter a message or proposed amount');
+      }
       return;
     }
 
@@ -152,13 +191,24 @@ export default function RequestDetailsScreen() {
         message: negotiationMessage.trim(),
         proposedAmount: proposedAmount ? parseFloat(proposedAmount) : undefined,
       });
-      Alert.alert('Success', 'Negotiation message sent');
+      
+      if (Platform.OS === 'web') {
+        alert('Success: Negotiation message sent');
+      } else {
+        Alert.alert('Success', 'Negotiation message sent');
+      }
+      
       setShowNegotiateModal(false);
       setNegotiationMessage('');
       setProposedAmount('');
       fetchRequestDetails();
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to send negotiation');
+      const errorMsg = error.response?.data?.message || 'Failed to send negotiation';
+      if (Platform.OS === 'web') {
+        alert('Error: ' + errorMsg);
+      } else {
+        Alert.alert('Error', errorMsg);
+      }
     } finally {
       setProcessing(false);
     }
@@ -172,32 +222,53 @@ export default function RequestDetailsScreen() {
     const lastNegotiation = negotiations[negotiations.length - 1];
     const negotiatedAmount = lastNegotiation?.proposedAmount;
 
-    Alert.alert(
-      'Accept Terms',
-      negotiatedAmount 
-        ? `Accept the negotiated amount of ${formatCurrency(negotiatedAmount)}?`
-        : 'Do you want to accept the current negotiation terms?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Accept',
-          onPress: async () => {
-            try {
-              setProcessing(true);
-              const response = await api.post(`/money-requests/${requestId}/accept-negotiation`);
-              const message = response.data?.message || 'Negotiation accepted. Request is now pending admin approval.';
-              Alert.alert('Success', message, [
-                { text: 'OK', onPress: () => navigation.goBack() }
-              ]);
-            } catch (error: any) {
-              Alert.alert('Error', error.response?.data?.message || 'Failed to accept negotiation');
-            } finally {
-              setProcessing(false);
-            }
-          },
-        },
-      ]
-    );
+    const confirmAccept = () => {
+      return new Promise<boolean>((resolve) => {
+        const message = negotiatedAmount 
+          ? `Accept the negotiated amount of ${formatCurrency(negotiatedAmount)}?`
+          : 'Do you want to accept the current negotiation terms?';
+        
+        if (Platform.OS === 'web') {
+          resolve(confirm(message));
+        } else {
+          Alert.alert(
+            'Accept Terms',
+            message,
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Accept', onPress: () => resolve(true) },
+            ]
+          );
+        }
+      });
+    };
+
+    const confirmed = await confirmAccept();
+    if (!confirmed) return;
+
+    try {
+      setProcessing(true);
+      const response = await api.post(`/money-requests/${requestId}/accept-negotiation`);
+      const message = response.data?.message || 'Negotiation accepted. Request is now pending admin approval.';
+      
+      if (Platform.OS === 'web') {
+        alert('Success: ' + message);
+        navigation.goBack();
+      } else {
+        Alert.alert('Success', message, [
+          { text: 'OK', onPress: () => navigation.goBack() }
+        ]);
+      }
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || 'Failed to accept negotiation';
+      if (Platform.OS === 'web') {
+        alert('Error: ' + errorMsg);
+      } else {
+        Alert.alert('Error', errorMsg);
+      }
+    } finally {
+      setProcessing(false);
+    }
   };
 
   const formatCurrency = (value: number) => {

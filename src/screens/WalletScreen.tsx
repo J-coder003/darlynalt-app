@@ -9,6 +9,7 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import Icon from 'react-native-vector-icons/Ionicons';
@@ -49,7 +50,12 @@ export default function WalletScreen() {
       const res = await api.get('/wallet');
       setWallet(res.data);
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to load wallet');
+      const errorMsg = error.response?.data?.message || 'Failed to load wallet';
+      if (Platform.OS === 'web') {
+        alert('Error: ' + errorMsg);
+      } else {
+        Alert.alert('Error', errorMsg);
+      }
     } finally {
       setLoading(false);
     }
@@ -57,19 +63,34 @@ export default function WalletScreen() {
 
   const handleFund = async () => {
     if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert('Error', 'Please enter a valid amount');
+      if (Platform.OS === 'web') {
+        alert('Error: Please enter a valid amount');
+      } else {
+        Alert.alert('Error', 'Please enter a valid amount');
+      }
       return;
     }
 
     try {
       setProcessing(true);
       await api.post('/wallet/fund', { amount: parseFloat(amount) });
-      Alert.alert('Success', 'Wallet funded successfully');
+      
+      if (Platform.OS === 'web') {
+        alert('Success: Wallet funded successfully');
+      } else {
+        Alert.alert('Success', 'Wallet funded successfully');
+      }
+      
       setShowFundModal(false);
       setAmount('');
       fetchWallet();
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to fund wallet');
+      const errorMsg = error.response?.data?.message || 'Failed to fund wallet';
+      if (Platform.OS === 'web') {
+        alert('Error: ' + errorMsg);
+      } else {
+        Alert.alert('Error', errorMsg);
+      }
     } finally {
       setProcessing(false);
     }
@@ -77,17 +98,29 @@ export default function WalletScreen() {
 
   const handleWithdraw = async () => {
     if (!amount || parseFloat(amount) <= 0) {
-      Alert.alert('Error', 'Please enter a valid amount');
+      if (Platform.OS === 'web') {
+        alert('Error: Please enter a valid amount');
+      } else {
+        Alert.alert('Error', 'Please enter a valid amount');
+      }
       return;
     }
 
     if (!bankAccount.trim()) {
-      Alert.alert('Error', 'Please enter your bank account details');
+      if (Platform.OS === 'web') {
+        alert('Error: Please enter your bank account details');
+      } else {
+        Alert.alert('Error', 'Please enter your bank account details');
+      }
       return;
     }
 
     if (parseFloat(amount) > wallet.balance) {
-      Alert.alert('Error', 'Insufficient balance');
+      if (Platform.OS === 'web') {
+        alert('Error: Insufficient balance');
+      } else {
+        Alert.alert('Error', 'Insufficient balance');
+      }
       return;
     }
 
@@ -97,13 +130,24 @@ export default function WalletScreen() {
         amount: parseFloat(amount),
         bankAccount: bankAccount.trim(),
       });
-      Alert.alert('Success', 'Withdrawal request submitted successfully');
+      
+      if (Platform.OS === 'web') {
+        alert('Success: Withdrawal request submitted successfully');
+      } else {
+        Alert.alert('Success', 'Withdrawal request submitted successfully');
+      }
+      
       setShowWithdrawModal(false);
       setAmount('');
       setBankAccount('');
       fetchWallet();
     } catch (error: any) {
-      Alert.alert('Error', error.response?.data?.message || 'Failed to withdraw');
+      const errorMsg = error.response?.data?.message || 'Failed to withdraw';
+      if (Platform.OS === 'web') {
+        alert('Error: ' + errorMsg);
+      } else {
+        Alert.alert('Error', errorMsg);
+      }
     } finally {
       setProcessing(false);
     }

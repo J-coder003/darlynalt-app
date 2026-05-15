@@ -8,6 +8,7 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useNavigation } from '@react-navigation/native';
@@ -116,13 +117,25 @@ export default function MoneyRequestScreen() {
           totalAmount: calculateTotal(),
         });
 
-        Alert.alert(
-          'Success', 
-          'Material request submitted successfully. You will be notified when the admin reviews it.',
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
-        );
+        if (Platform.OS === 'web') {
+          // On web, just show alert and navigate
+          alert('Success: Material request submitted successfully. You will be notified when the admin reviews it.');
+          navigation.goBack();
+        } else {
+          // On mobile, use Alert.alert
+          Alert.alert(
+            'Success', 
+            'Material request submitted successfully. You will be notified when the admin reviews it.',
+            [{ text: 'OK', onPress: () => navigation.goBack() }]
+          );
+        }
       } catch (error: any) {
-        Alert.alert('Error', error.response?.data?.message || 'Failed to submit request');
+        const errorMsg = error.response?.data?.message || 'Failed to submit request';
+        if (Platform.OS === 'web') {
+          alert('Error: ' + errorMsg);
+        } else {
+          Alert.alert('Error', errorMsg);
+        }
       } finally {
         setLoading(false);
       }
@@ -137,13 +150,25 @@ export default function MoneyRequestScreen() {
           description: wageDescription.trim(),
         });
 
-        Alert.alert(
-          'Success', 
-          'Wage request submitted successfully. You will be notified when the admin reviews it.',
-          [{ text: 'OK', onPress: () => navigation.goBack() }]
-        );
+        if (Platform.OS === 'web') {
+          // On web, just show alert and navigate
+          alert('Success: Wage request submitted successfully. You will be notified when the admin reviews it.');
+          navigation.goBack();
+        } else {
+          // On mobile, use Alert.alert
+          Alert.alert(
+            'Success', 
+            'Wage request submitted successfully. You will be notified when the admin reviews it.',
+            [{ text: 'OK', onPress: () => navigation.goBack() }]
+          );
+        }
       } catch (error: any) {
-        Alert.alert('Error', error.response?.data?.message || 'Failed to submit request');
+        const errorMsg = error.response?.data?.message || 'Failed to submit request';
+        if (Platform.OS === 'web') {
+          alert('Error: ' + errorMsg);
+        } else {
+          Alert.alert('Error', errorMsg);
+        }
       } finally {
         setLoading(false);
       }
