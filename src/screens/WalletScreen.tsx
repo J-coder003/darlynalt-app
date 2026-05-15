@@ -34,7 +34,6 @@ export default function WalletScreen() {
   const user = useSelector((state: RootState) => state.auth.user);
   const [wallet, setWallet] = useState<WalletData>({ balance: 0, transactions: [] });
   const [loading, setLoading] = useState(true);
-  const [showFundModal, setShowFundModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [amount, setAmount] = useState('');
   const [bankAccount, setBankAccount] = useState('');
@@ -58,41 +57,6 @@ export default function WalletScreen() {
       }
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleFund = async () => {
-    if (!amount || parseFloat(amount) <= 0) {
-      if (Platform.OS === 'web') {
-        alert('Error: Please enter a valid amount');
-      } else {
-        Alert.alert('Error', 'Please enter a valid amount');
-      }
-      return;
-    }
-
-    try {
-      setProcessing(true);
-      await api.post('/wallet/fund', { amount: parseFloat(amount) });
-      
-      if (Platform.OS === 'web') {
-        alert('Success: Wallet funded successfully');
-      } else {
-        Alert.alert('Success', 'Wallet funded successfully');
-      }
-      
-      setShowFundModal(false);
-      setAmount('');
-      fetchWallet();
-    } catch (error: any) {
-      const errorMsg = error.response?.data?.message || 'Failed to fund wallet';
-      if (Platform.OS === 'web') {
-        alert('Error: ' + errorMsg);
-      } else {
-        Alert.alert('Error', errorMsg);
-      }
-    } finally {
-      setProcessing(false);
     }
   };
 
@@ -190,16 +154,6 @@ export default function WalletScreen() {
           <Text style={styles.balanceAmount}>{formatCurrency(wallet.balance)}</Text>
 
           <View style={styles.actionButtons}>
-            {user?.role === 'customer' && (
-              <TouchableOpacity
-                style={[styles.actionButton, styles.fundButton]}
-                onPress={() => setShowFundModal(true)}
-              >
-                <Icon name="add-circle-outline" size={20} color="#fff" />
-                <Text style={styles.actionButtonText}>Fund Wallet</Text>
-              </TouchableOpacity>
-            )}
-
             <TouchableOpacity
               style={[styles.actionButton, styles.withdrawButton]}
               onPress={() => setShowWithdrawModal(true)}
@@ -272,49 +226,6 @@ export default function WalletScreen() {
         </View>
       </ScrollView>
 
-      {/* Fund Modal */}
-      <Modal visible={showFundModal} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Fund Wallet</Text>
-
-            <TextInput
-              style={styles.input}
-              placeholder="Enter amount"
-              placeholderTextColor="#6b7280"
-              keyboardType="numeric"
-              value={amount}
-              onChangeText={setAmount}
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowFundModal(false);
-                  setAmount('');
-                }}
-                disabled={processing}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
-                onPress={handleFund}
-                disabled={processing}
-              >
-                {processing ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.confirmButtonText}>Fund</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
       {/* Withdraw Modal */}
       <Modal visible={showWithdrawModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
@@ -370,6 +281,7 @@ export default function WalletScreen() {
           </View>
         </View>
       </Modal>
+
     </View>
   );
 }
