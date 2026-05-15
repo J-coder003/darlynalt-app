@@ -3,6 +3,8 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AuthStack from './AuthStack';
 import Tabs from './Tabs';
 import LandingScreen from '../screens/LandingScreen';
+import MoneyRequestScreen from '../screens/MoneyRequestScreen';
+import RequestDetailsScreen from '../screens/RequestDetailsScreen';
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState, AppDispatch } from '../store/store';
 import { ActivityIndicator, View } from 'react-native';
@@ -12,6 +14,8 @@ export type RootStackParamList = {
   Landing: undefined;
   Auth: undefined;
   Main: undefined;
+  MoneyRequest: undefined;
+  RequestDetails: { requestId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -40,7 +44,11 @@ export default function AppNavigator() {
           <Stack.Screen name="Auth" component={AuthStack} />
         </>
       ) : (
-        <Stack.Screen name="Main" component={Tabs} />
+        <>
+          <Stack.Screen name="Main" component={Tabs} />
+          <Stack.Screen name="MoneyRequest" component={MoneyRequestScreen} />
+          <Stack.Screen name="RequestDetails" component={RequestDetailsScreen} />
+        </>
       )}
     </Stack.Navigator>
   );

@@ -30,10 +30,15 @@ export default function CustomInput({
 
 const styles = StyleSheet.create({
   input: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 12,
-    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: '#2a2a40',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 12,
     marginVertical: 8,
+    backgroundColor: '#111120',
+    color: '#e0e0ff',
+    fontSize: 15,
+    height: 52,
   },
 });

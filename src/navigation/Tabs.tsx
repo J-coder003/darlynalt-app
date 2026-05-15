@@ -9,6 +9,9 @@ import JobsScreen from '../screens/JobsScreen';
 import ChatScreen from '../screens/ChatScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import InvoicesScreen from '../screens/InvoicesScreen';
+import WalletScreen from '../screens/WalletScreen';
+import RequestListScreen from '../screens/RequestListScreen';
+import RequestManagementScreen from '../screens/RequestManagementScreen';
 import { TabParamList } from './types';
 
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -20,6 +23,17 @@ export default function Tabs() {
     <Tab.Navigator 
       screenOptions={({ route }) => ({
         headerShown: false,
+        tabBarStyle: {
+          backgroundColor: '#0a0a0f',
+          borderTopColor: '#1a1a30',
+          height: 62,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          marginTop: -4,
+        },
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: string;
 
@@ -33,6 +47,12 @@ export default function Tabs() {
             case 'Invoices':
               iconName = focused ? 'receipt' : 'receipt-outline';
               break;
+            case 'Wallet':
+              iconName = focused ? 'wallet' : 'wallet-outline';
+              break;
+            case 'Requests':
+              iconName = focused ? 'document-text' : 'document-text-outline';
+              break;
             case 'Chat':
               iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
               break;
@@ -45,8 +65,8 @@ export default function Tabs() {
 
           return <Icon name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: '#7c8bff',
+        tabBarInactiveTintColor: '#8f94b2',
       })}
     >
       {role === 'customer' ? (
@@ -54,11 +74,15 @@ export default function Tabs() {
           <Tab.Screen name="Home" component={CustomerHome} />
           <Tab.Screen name="Jobs" component={JobsScreen} />
           <Tab.Screen name="Invoices" component={InvoicesScreen} />
+          <Tab.Screen name="Wallet" component={WalletScreen} />
+          <Tab.Screen name="Requests" component={RequestManagementScreen} />
           <Tab.Screen name="Chat" component={ChatScreen} />
         </>
       ) : (
         <>
           <Tab.Screen name="Home" component={WorkerHome} />
+          <Tab.Screen name="Wallet" component={WalletScreen} />
+          <Tab.Screen name="Requests" component={RequestListScreen} />
           <Tab.Screen name="Chat" component={ChatScreen} />
         </>
       )}

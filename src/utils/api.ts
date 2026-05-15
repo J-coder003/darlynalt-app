@@ -3,7 +3,7 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ✅ Use your deployed Render backend
-const API_URL = 'https://darlyn-alt-backend.onrender.com';
+const API_URL = 'https://darlyn-alt-backend-znbx.onrender.com';
 
 const api = axios.create({
   baseURL: API_URL,

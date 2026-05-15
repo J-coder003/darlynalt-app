@@ -24,14 +24,17 @@ export default function CustomButton({ title, onPress, backgroundColor = '#2563e
 
 const styles = StyleSheet.create({
   button: {
-    paddingVertical: 14,
-    borderRadius: 8,
+    paddingVertical: 15,
+    borderRadius: 12,
     alignItems: 'center',
     marginTop: 10,
+    borderWidth: 0.5,
+    borderColor: 'rgba(83, 64, 240, 0.3)',
   },
   text: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '500',
+    letterSpacing: 0.3,
   },
 });
