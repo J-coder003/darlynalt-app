@@ -165,9 +165,18 @@ export default function RequestDetailsScreen() {
   };
 
   const handleAcceptNegotiation = async () => {
+    if (!request) return;
+    
+    // Get the last negotiated amount
+    const negotiations = request.negotiations || [];
+    const lastNegotiation = negotiations[negotiations.length - 1];
+    const negotiatedAmount = lastNegotiation?.proposedAmount;
+
     Alert.alert(
       'Accept Terms',
-      'Do you want to accept the current negotiation terms?',
+      negotiatedAmount 
+        ? `Accept the negotiated amount of ${formatCurrency(negotiatedAmount)}?`
+        : 'Do you want to accept the current negotiation terms?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -175,8 +184,9 @@ export default function RequestDetailsScreen() {
           onPress: async () => {
             try {
               setProcessing(true);
-              await api.post(`/money-requests/${requestId}/accept-negotiation`);
-              Alert.alert('Success', 'Negotiation accepted. Request is now pending admin approval.', [
+              const response = await api.post(`/money-requests/${requestId}/accept-negotiation`);
+              const message = response.data?.message || 'Negotiation accepted. Request is now pending admin approval.';
+              Alert.alert('Success', message, [
                 { text: 'OK', onPress: () => navigation.goBack() }
               ]);
             } catch (error: any) {

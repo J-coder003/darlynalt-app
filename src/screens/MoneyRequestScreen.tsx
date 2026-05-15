@@ -116,9 +116,11 @@ export default function MoneyRequestScreen() {
           totalAmount: calculateTotal(),
         });
 
-        Alert.alert('Success', 'Material request submitted successfully', [
-          { text: 'OK', onPress: () => navigation.goBack() },
-        ]);
+        Alert.alert(
+          'Success', 
+          'Material request submitted successfully. You will be notified when the admin reviews it.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
       } catch (error: any) {
         Alert.alert('Error', error.response?.data?.message || 'Failed to submit request');
       } finally {
@@ -135,9 +137,11 @@ export default function MoneyRequestScreen() {
           description: wageDescription.trim(),
         });
 
-        Alert.alert('Success', 'Wage request submitted successfully', [
-          { text: 'OK', onPress: () => navigation.goBack() },
-        ]);
+        Alert.alert(
+          'Success', 
+          'Wage request submitted successfully. You will be notified when the admin reviews it.',
+          [{ text: 'OK', onPress: () => navigation.goBack() }]
+        );
       } catch (error: any) {
         Alert.alert('Error', error.response?.data?.message || 'Failed to submit request');
       } finally {
