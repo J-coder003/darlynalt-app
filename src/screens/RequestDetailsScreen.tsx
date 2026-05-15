@@ -102,9 +102,10 @@ export default function RequestDetailsScreen() {
       await api.put(`/money-requests/${requestId}/approve`, {
         approvedAmount: amount,
       });
-      Alert.alert('Success', 'Request approved and funds transferred successfully');
+      Alert.alert('Success', 'Request approved and funds transferred successfully', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
       setShowApproveModal(false);
-      fetchRequestDetails();
     } catch (error: any) {
       Alert.alert('Error', error.response?.data?.message || 'Failed to approve request');
     } finally {
@@ -125,8 +126,9 @@ export default function RequestDetailsScreen() {
             try {
               setProcessing(true);
               await api.put(`/money-requests/${requestId}/reject`);
-              Alert.alert('Success', 'Request rejected');
-              fetchRequestDetails();
+              Alert.alert('Success', 'Request rejected', [
+                { text: 'OK', onPress: () => navigation.goBack() }
+              ]);
             } catch (error: any) {
               Alert.alert('Error', error.response?.data?.message || 'Failed to reject request');
             } finally {
@@ -174,8 +176,9 @@ export default function RequestDetailsScreen() {
             try {
               setProcessing(true);
               await api.post(`/money-requests/${requestId}/accept-negotiation`);
-              Alert.alert('Success', 'Negotiation accepted');
-              fetchRequestDetails();
+              Alert.alert('Success', 'Negotiation accepted. Request is now pending admin approval.', [
+                { text: 'OK', onPress: () => navigation.goBack() }
+              ]);
             } catch (error: any) {
               Alert.alert('Error', error.response?.data?.message || 'Failed to accept negotiation');
             } finally {
