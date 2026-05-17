@@ -62,4 +62,20 @@ api.interceptors.response.use(
   }
 );
 
+export const bankAccountsAPI = {
+  getBanks: () => api.get('/bank-accounts/banks'),
+
+  verifyAccount: (accountNumber: string, bankCode: string) =>
+    api.post('/bank-accounts/verify', { accountNumber, bankCode }),
+
+  getUserAccounts: () => api.get('/bank-accounts'),
+
+  addAccount: (accountNumber: string, bankCode: string, isPrimary?: boolean) =>
+    api.post('/bank-accounts', { accountNumber, bankCode, isPrimary }),
+
+  deleteAccount: (accountId: string) => api.delete(`/bank-accounts/${accountId}`),
+
+  setPrimary: (accountId: string) => api.patch(`/bank-accounts/${accountId}/primary`),
+};
+
 export default api;

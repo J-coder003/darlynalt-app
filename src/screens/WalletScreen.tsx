@@ -14,7 +14,7 @@ import {
 import { useSelector } from 'react-redux';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { RootState } from '../store/store';
-import api from '../utils/api';
+import api, { bankAccountsAPI } from '../utils/api';
 
 interface Transaction {
   _id: string;
@@ -36,12 +36,34 @@ export default function WalletScreen() {
   const [loading, setLoading] = useState(true);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [amount, setAmount] = useState('');
-  const [bankAccount, setBankAccount] = useState('');
   const [processing, setProcessing] = useState(false);
+
+  const [banks, setBanks] = useState<{ name: string; code: string; slug: string }[]>([]);
+  const [savedAccounts, setSavedAccounts] = useState<{
+    _id: string;
+    accountNumber: string;
+    accountName: string;
+    bankName: string;
+    bankCode: string;
+    isPrimary: boolean;
+  }[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [showAddAccount, setShowAddAccount] = useState(false);
+  const [newAccountNumber, setNewAccountNumber] = useState('');
+  const [selectedBankCode, setSelectedBankCode] = useState('');
+  const [verifiedAccountName, setVerifiedAccountName] = useState('');
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     fetchWallet();
   }, []);
+
+  useEffect(() => {
+    if (showWithdrawModal) {
+      fetchBanks();
+      fetchSavedAccounts();
+    }
+  }, [showWithdrawModal]);
 
   const fetchWallet = async () => {
     try {
@@ -60,6 +82,120 @@ export default function WalletScreen() {
     }
   };
 
+  const fetchBanks = async () => {
+    try {
+      const res = await bankAccountsAPI.getBanks();
+      setBanks(res.data);
+    } catch (error: any) {
+      console.error('Failed to load banks:', error);
+    }
+  };
+
+  const fetchSavedAccounts = async () => {
+    try {
+      const res = await bankAccountsAPI.getUserAccounts();
+      setSavedAccounts(res.data);
+      if (res.data.length > 0) {
+        const primary = res.data.find((acc: any) => acc.isPrimary);
+        setSelectedAccountId(primary?._id || res.data[0]._id);
+      } else {
+        setSelectedAccountId('');
+      }
+    } catch (error: any) {
+      console.error('Failed to load saved bank accounts:', error);
+    }
+  };
+
+  const handleVerifyAccount = async () => {
+    if (newAccountNumber.length !== 10) {
+      if (Platform.OS === 'web') {
+        alert('Error: Enter a valid 10-digit account number');
+      } else {
+        Alert.alert('Error', 'Enter a valid 10-digit account number');
+      }
+      return;
+    }
+
+    if (!selectedBankCode) {
+      if (Platform.OS === 'web') {
+        alert('Error: Select a bank');
+      } else {
+        Alert.alert('Error', 'Select a bank');
+      }
+      return;
+    }
+
+    try {
+      setVerifying(true);
+      const res = await bankAccountsAPI.verifyAccount(newAccountNumber, selectedBankCode);
+      setVerifiedAccountName(res.data.accountName);
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || 'Failed to verify account';
+      if (Platform.OS === 'web') {
+        alert('Error: ' + errorMsg);
+      } else {
+        Alert.alert('Error', errorMsg);
+      }
+      setVerifiedAccountName('');
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  const handleAddAccount = async () => {
+    if (!verifiedAccountName) {
+      if (Platform.OS === 'web') {
+        alert('Error: Verify account first');
+      } else {
+        Alert.alert('Error', 'Verify account first');
+      }
+      return;
+    }
+
+    try {
+      setProcessing(true);
+      await bankAccountsAPI.addAccount(newAccountNumber, selectedBankCode, savedAccounts.length === 0);
+      if (Platform.OS === 'web') {
+        alert('Bank account added successfully');
+      } else {
+        Alert.alert('Success', 'Bank account added successfully');
+      }
+      setShowAddAccount(false);
+      setNewAccountNumber('');
+      setSelectedBankCode('');
+      setVerifiedAccountName('');
+      fetchSavedAccounts();
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || 'Failed to add account';
+      if (Platform.OS === 'web') {
+        alert('Error: ' + errorMsg);
+      } else {
+        Alert.alert('Error', errorMsg);
+      }
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleDeleteAccount = async (accountId: string) => {
+    try {
+      await bankAccountsAPI.deleteAccount(accountId);
+      if (Platform.OS === 'web') {
+        alert('Account deleted');
+      } else {
+        Alert.alert('Success', 'Account deleted');
+      }
+      fetchSavedAccounts();
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.message || 'Failed to delete account';
+      if (Platform.OS === 'web') {
+        alert('Error: ' + errorMsg);
+      } else {
+        Alert.alert('Error', errorMsg);
+      }
+    }
+  };
+
   const handleWithdraw = async () => {
     if (!amount || parseFloat(amount) <= 0) {
       if (Platform.OS === 'web') {
@@ -70,11 +206,11 @@ export default function WalletScreen() {
       return;
     }
 
-    if (!bankAccount.trim()) {
+    if (!selectedAccountId) {
       if (Platform.OS === 'web') {
-        alert('Error: Please enter your bank account details');
+        alert('Error: Select a saved bank account or add one first');
       } else {
-        Alert.alert('Error', 'Please enter your bank account details');
+        Alert.alert('Error', 'Select a saved bank account or add one first');
       }
       return;
     }
@@ -92,7 +228,7 @@ export default function WalletScreen() {
       setProcessing(true);
       await api.post('/wallet/withdraw', {
         amount: parseFloat(amount),
-        bankAccount: bankAccount.trim(),
+        bankAccountId: selectedAccountId,
       });
       
       if (Platform.OS === 'web') {
@@ -103,7 +239,6 @@ export default function WalletScreen() {
       
       setShowWithdrawModal(false);
       setAmount('');
-      setBankAccount('');
       fetchWallet();
     } catch (error: any) {
       const errorMsg = error.response?.data?.message || 'Failed to withdraw';
@@ -226,58 +361,186 @@ export default function WalletScreen() {
         </View>
       </ScrollView>
 
-      {/* Withdraw Modal */}
+      {/* Withdraw/Add Account Modal */}
       <Modal visible={showWithdrawModal} transparent animationType="slide">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Withdraw Funds</Text>
+            {showAddAccount ? (
+              <>
+                <Text style={styles.modalTitle}>Add Bank Account</Text>
 
-            <TextInput
-              style={styles.input}
-              placeholder="Enter amount"
-              placeholderTextColor="#6b7280"
-              keyboardType="numeric"
-              value={amount}
-              onChangeText={setAmount}
-            />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Account number"
+                  placeholderTextColor="#6b7280"
+                  keyboardType="numeric"
+                  maxLength={10}
+                  value={newAccountNumber}
+                  onChangeText={(value) => {
+                    setNewAccountNumber(value.replace(/\D/g, ''));
+                    setVerifiedAccountName('');
+                  }}
+                />
 
-            <TextInput
-              style={styles.input}
-              placeholder="Bank account number"
-              placeholderTextColor="#6b7280"
-              value={bankAccount}
-              onChangeText={setBankAccount}
-            />
+                <View style={styles.selectWrapper}>
+                  <Text style={styles.selectLabel}>Bank</Text>
+                  <ScrollView style={styles.selectList}>
+                    {banks.map((bank) => (
+                      <TouchableOpacity
+                        key={bank.code}
+                        onPress={() => {
+                          setSelectedBankCode(bank.code);
+                          setVerifiedAccountName('');
+                        }}
+                        style={[
+                          styles.selectItem,
+                          selectedBankCode === bank.code && styles.selectItemSelected,
+                        ]}
+                      >
+                        <Text style={styles.selectItemText}>{bank.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
 
-            <Text style={styles.balanceInfo}>
-              Available: {formatCurrency(wallet.balance)}
-            </Text>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowWithdrawModal(false);
-                  setAmount('');
-                  setBankAccount('');
-                }}
-                disabled={processing}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
-                onPress={handleWithdraw}
-                disabled={processing}
-              >
-                {processing ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.confirmButtonText}>Withdraw</Text>
+                {selectedBankCode && newAccountNumber.length === 10 && !verifiedAccountName && (
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.confirmButton, { marginBottom: 16 }]}
+                    onPress={handleVerifyAccount}
+                    disabled={verifying}
+                  >
+                    {verifying ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.confirmButtonText}>Verify Account</Text>
+                    )}
+                  </TouchableOpacity>
                 )}
-              </TouchableOpacity>
-            </View>
+
+                {verifiedAccountName ? (
+                  <View style={styles.verifiedBox}>
+                    <Text style={styles.verifiedLabel}>Account name</Text>
+                    <Text style={styles.verifiedText}>{verifiedAccountName}</Text>
+                  </View>
+                ) : null}
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.cancelButton]}
+                    onPress={() => {
+                      setShowAddAccount(false);
+                      setNewAccountNumber('');
+                      setSelectedBankCode('');
+                      setVerifiedAccountName('');
+                    }}
+                    disabled={processing}
+                  >
+                    <Text style={styles.cancelButtonText}>Back</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.confirmButton]}
+                    onPress={handleAddAccount}
+                    disabled={!verifiedAccountName || processing}
+                  >
+                    {processing ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.confirmButtonText}>Save Account</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={styles.modalTitle}>Withdraw Funds</Text>
+
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter amount"
+                  placeholderTextColor="#6b7280"
+                  keyboardType="numeric"
+                  value={amount}
+                  onChangeText={setAmount}
+                />
+
+                {savedAccounts.length > 0 ? (
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={[styles.balanceInfo, { marginBottom: 12, color: '#e5e7eb' }]}>Select saved bank account</Text>
+                    {savedAccounts.map((account) => (
+                      <TouchableOpacity
+                        key={account._id}
+                        onPress={() => setSelectedAccountId(account._id)}
+                        style={[
+                          styles.accountCard,
+                          selectedAccountId === account._id && styles.accountCardSelected,
+                        ]}
+                      >
+                        <Text style={styles.accountBank}>{account.bankName}</Text>
+                        <Text style={styles.accountDetails}>{account.accountNumber} • {account.accountName}</Text>
+                        {account.isPrimary && <Text style={styles.primaryTag}>PRIMARY</Text>}
+                      </TouchableOpacity>
+                    ))}
+
+                    {savedAccounts.length < 2 ? (
+                      <TouchableOpacity
+                        style={[styles.modalButton, styles.secondaryButton, { marginTop: 12 }]}
+                        onPress={() => {
+                          setShowAddAccount(true);
+                          setVerifiedAccountName('');
+                          setNewAccountNumber('');
+                          setSelectedBankCode('');
+                        }}
+                      >
+                        <Text style={styles.secondaryButtonText}>Add bank account</Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                ) : (
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={[styles.balanceInfo, { marginBottom: 12, color: '#e5e7eb' }]}>No saved bank accounts yet.</Text>
+                    <TouchableOpacity
+                      style={[styles.modalButton, styles.secondaryButton]}
+                      onPress={() => setShowAddAccount(true)}
+                    >
+                      <Text style={styles.secondaryButtonText}>Add bank account</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                <Text style={styles.balanceInfo}>
+                  Available: {formatCurrency(wallet.balance)}
+                </Text>
+
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.cancelButton]}
+                    onPress={() => {
+                      setShowWithdrawModal(false);
+                      setShowAddAccount(false);
+                      setAmount('');
+                      setNewAccountNumber('');
+                      setSelectedBankCode('');
+                      setVerifiedAccountName('');
+                    }}
+                    disabled={processing}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.confirmButton]}
+                    onPress={handleWithdraw}
+                    disabled={processing}
+                  >
+                    {processing ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.confirmButtonText}>Withdraw</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -491,5 +754,80 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  secondaryButton: {
+    backgroundColor: '#2d3748',
+  },
+  secondaryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  accountCard: {
+    padding: 14,
+    borderRadius: 12,
+    backgroundColor: '#11121f',
+    marginBottom: 12,
+  },
+  accountCardSelected: {
+    borderWidth: 2,
+    borderColor: '#7c8bff',
+    backgroundColor: '#1f256a',
+  },
+  accountBank: {
+    color: '#fff',
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  accountDetails: {
+    color: '#cbd5e1',
+    fontSize: 13,
+    marginBottom: 6,
+  },
+  primaryTag: {
+    color: '#7c8bff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  selectWrapper: {
+    marginBottom: 16,
+  },
+  selectLabel: {
+    color: '#cbd5e1',
+    marginBottom: 8,
+  },
+  selectList: {
+    maxHeight: 200,
+    backgroundColor: '#11121f',
+    borderRadius: 12,
+    padding: 8,
+  },
+  selectItem: {
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: '#1a1a30',
+    marginBottom: 8,
+  },
+  selectItemSelected: {
+    backgroundColor: '#2d3748',
+  },
+  selectItemText: {
+    color: '#fff',
+  },
+  verifiedBox: {
+    backgroundColor: '#1a372d',
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  verifiedLabel: {
+    color: '#9ae6b4',
+    fontSize: 12,
+    marginBottom: 6,
+  },
+  verifiedText: {
+    color: '#d1fae5',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
